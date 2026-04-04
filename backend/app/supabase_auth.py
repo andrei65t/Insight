@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import requests
 
@@ -11,6 +11,17 @@ def _supabase_headers() -> Dict[str, str]:
         "Authorization": f"Bearer {settings.SUPABASE_ANON_KEY}",
         "Content-Type": "application/json",
     }
+
+
+def _supabase_service_headers(prefer: str | None = None) -> Dict[str, str]:
+    headers = {
+        "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
+        "Content-Type": "application/json",
+    }
+    if prefer:
+        headers["Prefer"] = prefer
+    return headers
 
 
 def sign_in_with_password(email: str, password: str) -> Dict[str, Any]:
@@ -50,3 +61,57 @@ def sign_up(email: str, password: str, full_name: str | None = None) -> Dict[str
         raise RuntimeError(detail)
 
     return response.json()
+
+
+def get_user_from_access_token(access_token: str) -> Dict[str, Any]:
+    url = f"{settings.SUPABASE_URL}/auth/v1/user"
+    headers = {
+        "apikey": settings.SUPABASE_ANON_KEY,
+        "Authorization": f"Bearer {access_token}",
+    }
+    response = requests.get(url, headers=headers, timeout=30)
+
+    if response.status_code >= 400:
+        raise RuntimeError("Invalid or expired access token")
+
+    return response.json()
+
+
+def add_tracked_company(user_id: str, company_name: str) -> Dict[str, Any]:
+    url = f"{settings.SUPABASE_URL}/rest/v1/{settings.TRACKING_TABLE}"
+    payload = [{"user_id": user_id, "company_name": company_name}]
+    headers = _supabase_service_headers(prefer="resolution=merge-duplicates,return=representation")
+
+    response = requests.post(
+        url,
+        headers=headers,
+        params={"on_conflict": "user_id,company_name"},
+        json=payload,
+        timeout=30,
+    )
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"Failed to track company: {response.text}")
+
+    data = response.json()
+    return data[0] if isinstance(data, list) and data else {}
+
+
+def list_tracked_companies(user_id: str) -> List[Dict[str, Any]]:
+    url = f"{settings.SUPABASE_URL}/rest/v1/{settings.TRACKING_TABLE}"
+    response = requests.get(
+        url,
+        headers=_supabase_service_headers(),
+        params={
+            "select": "id,company_name,created_at",
+            "user_id": f"eq.{user_id}",
+            "order": "created_at.desc",
+        },
+        timeout=30,
+    )
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"Failed to fetch tracked companies: {response.text}")
+
+    data = response.json()
+    return data if isinstance(data, list) else []

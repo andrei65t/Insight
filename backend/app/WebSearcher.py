@@ -1,14 +1,16 @@
 import os
+import json
+import re
 from pathlib import Path
 
 import requests
 from dotenv import load_dotenv
 
 # Load backend/.env even when running from backend/app
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+load_dotenv()
 
 
-class WebScraper:
+class WebSearcher:
     def __init__(self, api_key: str | None = None):
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
         if not self.api_key:
@@ -20,7 +22,7 @@ class WebScraper:
             "google/gemma-4-26b-a4b-it",
         ]
 
-    def _call_model(self, model_id: str, prompt: str) -> str:
+    def _query_model(self, model_id: str, prompt: str) -> str:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -32,8 +34,11 @@ class WebScraper:
                 {
                     "role": "system",
                     "content": (
-                        #"Find up-to-date public information about the company using web sources. "
-                        #"Return concise bullet points and include source links."
+                        "Find the legal name of the company the user requested in JSON format in a vector node named contenders."
+                        "If there are more of them put all of them in the JSON."
+                        "If the requested input is not a company name, return a JSON node 'error' saying 'you can only search companies'"
+                        "In each contender node, return just the legal name of the company and their website."
+                        "Return the candidates from all countries"
                     ),
                 },
                 {"role": "user", "content": prompt},
@@ -50,26 +55,29 @@ class WebScraper:
             raise RuntimeError(f"{response.status_code} {response.text}")
 
         data = response.json()
-        return data["choices"][0]["message"]["content"]
+        return data
 
     @staticmethod
-    def _looks_like_cutoff_response(text: str) -> bool:
-        lowered = text.lower()
-        return (
-            "knowledge cutoff" in lowered
-            or "my knowledge is current up to" in lowered
-            or "up to october 2023" in lowered
-            or "up to 2023" in lowered
-        )
+    def _extract_json_content(api_response: dict) -> dict:
+        content = api_response["choices"][0]["message"]["content"]
+        if isinstance(content, dict):
+            return content
+        if not isinstance(content, str):
+            raise ValueError("Unexpected content type in model response.")
 
-    def search_company_info(self, prompt: str) -> str:
+        cleaned = content.strip()
+        match = re.search(r"```json\s*(.*?)\s*```", cleaned, flags=re.DOTALL | re.IGNORECASE)
+        if match:
+            cleaned = match.group(1).strip()
+
+        return json.loads(cleaned)
+
+    def search_web_info(self, prompt: str) -> dict:
         last_error = ""
 
         for model in self.model_candidates:
             try:
-                result = self._call_model(model, prompt)
-                if self._looks_like_cutoff_response(result):
-                    raise RuntimeError("Model returned cutoff-style response (no live web retrieval).")
+                result = self._query_model(model, prompt)
                 print(f"Model used: {model}")
                 return result
             except Exception as exc:
@@ -81,10 +89,8 @@ class WebScraper:
 
 if __name__ == "__main__":
     # Editeaza promptul direct aici
-    PROMPT = "Cauta pe net si da-mi numele legal al companiei Soft 31. Daca sunt mai multe variante, afiseaza le pe toate, cu un link langa, una sub alta" 
-    "What is the latest date you give information from?"
+    PROMPT = "Soft 31"
 
-    scraper = WebScraper()
-    result = scraper.search_company_info(PROMPT)
-    print("\n=== WEB RESEARCH RESULT ===\n")
-    print(result)
+    searcher = WebSearcher()
+    result = searcher.search_web_info(PROMPT)
+    print(json.dumps(searcher._extract_json_content(result), ensure_ascii=False, indent=2))
