@@ -1,22 +1,36 @@
 import React, { useState } from 'react';
 import { api } from '../lib/api';
 
-export const LoginView: React.FC = () => {
+export const RegisterView: React.FC = () => {
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setSuccess(null);
 
     try {
-      await api.login(email, password);
-      window.location.href = '/dashboard';
+      const data = await api.register({
+        email,
+        password,
+        full_name: fullName || undefined,
+      });
+
+      if (data.access_token) {
+        window.location.href = '/dashboard';
+        return;
+      }
+
+      setSuccess('Cont creat. Verifica email-ul pentru confirmare, apoi autentifica-te.');
+      setIsLoading(false);
     } catch {
-      setError('Invalid email or password');
+      setError('Register failed. Verifica datele si incearca din nou.');
       setIsLoading(false);
     }
   };
@@ -26,7 +40,7 @@ export const LoginView: React.FC = () => {
       <div className="w-full max-w-sm bg-white p-8 rounded-xl shadow-sm border border-slate-200">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">TrustScope</h1>
-          <p className="text-slate-500 mt-1">Login</p>
+          <p className="text-slate-500 mt-1">Create account</p>
         </div>
 
         {error && (
@@ -35,7 +49,20 @@ export const LoginView: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-4">
+        {success && (
+          <div className="mb-4 p-3 bg-emerald-50 text-emerald-700 text-sm rounded-md border border-emerald-100">
+            {success}
+          </div>
+        )}
+
+        <form onSubmit={handleRegister} className="space-y-4">
+          <input
+            type="text"
+            placeholder="Full name (optional)"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            className="w-full px-4 py-2 border rounded-md outline-none focus:ring-2 focus:ring-blue-500"
+          />
           <input
             type="email"
             placeholder="Email"
@@ -46,10 +73,11 @@ export const LoginView: React.FC = () => {
           />
           <input
             type="password"
-            placeholder="Password"
+            placeholder="Password (min 6 chars)"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="w-full px-4 py-2 border rounded-md outline-none focus:ring-2 focus:ring-blue-500"
+            minLength={6}
             required
           />
           <button
@@ -57,26 +85,22 @@ export const LoginView: React.FC = () => {
             className="w-full bg-slate-900 text-white py-2.5 rounded-md font-semibold hover:bg-slate-800 transition shadow-sm"
             disabled={isLoading}
           >
-            {isLoading ? 'Authenticating...' : 'Sign In'}
+            {isLoading ? 'Creating account...' : 'Register'}
           </button>
         </form>
 
         <div className="mt-5 text-center text-sm text-slate-600">
-          <span>Nu ai cont? </span>
+          <span>Ai deja cont? </span>
           <button
             type="button"
             className="font-semibold text-blue-600 hover:text-blue-700"
             onClick={() => {
-              window.location.href = '/register';
+              window.location.href = '/login';
             }}
           >
-            Register
+            Sign in
           </button>
         </div>
-
-        <p className="text-center text-xs text-slate-400 mt-6 uppercase tracking-widest font-bold">
-          TrustScope
-        </p>
       </div>
     </div>
   );

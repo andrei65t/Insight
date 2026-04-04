@@ -1,36 +1,71 @@
-from datetime import timedelta
 from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlmodel import Session, select
-from app import security
-from app.config import settings
-from app.models import User
-from app.database import get_db
+from pydantic import BaseModel, Field
+
+from app.supabase_auth import sign_in_with_password, sign_up
 
 router = APIRouter()
 
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str = Field(min_length=6)
+    full_name: str | None = None
+
+
+@router.post("/login/register")
+def register_user(payload: RegisterRequest) -> Any:
+    try:
+        auth_data = sign_up(
+            email=payload.email,
+            password=payload.password,
+            full_name=payload.full_name,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    return {
+        "user": auth_data.get("user"),
+        "access_token": auth_data.get("access_token"),
+        "refresh_token": auth_data.get("refresh_token"),
+        "token_type": "bearer" if auth_data.get("access_token") else None,
+        "expires_in": auth_data.get("expires_in"),
+    }
+
+
 @router.post("/login/access-token")
 def login_access_token(
-    db: Session = Depends(get_db),
     form_data: OAuth2PasswordRequestForm = Depends(),
 ) -> Any:
     """
-    OAuth2 compatible token login, get an access token for future requests
+    OAuth2 compatible token login via Supabase Auth.
     """
-    user = db.exec(select(User).where(User.email == form_data.username)).first()
-    if not user or not security.verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect email or password"
+    try:
+        auth_data = sign_in_with_password(
+            email=form_data.username,
+            password=form_data.password,
         )
-    elif not user.is_active:
+    except RuntimeError as exc:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    access_token = auth_data.get("access_token")
+    if not access_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Supabase did not return an access token",
         )
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
     return {
-        "access_token": security.create_access_token(
-            user.id, expires_delta=access_token_expires
-        ),
+        "access_token": access_token,
         "token_type": "bearer",
+        "refresh_token": auth_data.get("refresh_token"),
+        "expires_in": auth_data.get("expires_in"),
     }

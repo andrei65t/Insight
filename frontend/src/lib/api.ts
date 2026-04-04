@@ -1,30 +1,65 @@
 const BASE_URL = 'http://localhost:8000/api/v1';
 
+type LoginResponse = {
+  access_token?: string;
+  refresh_token?: string;
+  token_type?: string;
+  expires_in?: number;
+};
+
+type RegisterPayload = {
+  email: string;
+  password: string;
+  full_name?: string;
+};
+
 export const api = {
-  async login(email, password) {
+  async login(email: string, password: string): Promise<LoginResponse> {
     const formData = new FormData();
     formData.append('username', email);
     formData.append('password', password);
-    
+
     const response = await fetch(`${BASE_URL}/login/access-token`, {
       method: 'POST',
       body: formData,
     });
-    
+
     if (!response.ok) {
       throw new Error('Login failed');
     }
-    
-    const data = await response.json();
-    localStorage.setItem('token', data.access_token);
+
+    const data: LoginResponse = await response.json();
+    if (data.access_token) {
+      localStorage.setItem('token', data.access_token);
+    }
     return data;
   },
-  
+
+  async register(payload: RegisterPayload): Promise<LoginResponse & { user?: unknown }> {
+    const response = await fetch(`${BASE_URL}/login/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error('Register failed');
+    }
+
+    const data = await response.json();
+    if (data.access_token) {
+      localStorage.setItem('token', data.access_token);
+    }
+    return data;
+  },
+
   logout() {
     localStorage.removeItem('token');
   },
-  
+
   getToken() {
     return localStorage.getItem('token');
-  }
+  },
 };
