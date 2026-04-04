@@ -1,7 +1,10 @@
 import json
 import sys
 
-from HaikuService import HaikuService
+try:
+    from app.HaikuService import HaikuService
+except ModuleNotFoundError:
+    from HaikuService import HaikuService
 
 
 class SignalNoiseClassifier:

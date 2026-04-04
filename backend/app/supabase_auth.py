@@ -124,6 +124,25 @@ def list_tracked_companies(user_id: str) -> List[Dict[str, Any]]:
     return data if isinstance(data, list) else []
 
 
+def delete_tracked_company(user_id: str, company_name: str) -> List[Dict[str, Any]]:
+    url = f"{settings.SUPABASE_URL}/rest/v1/{settings.TRACKING_TABLE}"
+    response = requests.delete(
+        url,
+        headers=_supabase_service_headers(prefer="return=representation"),
+        params={
+            "user_id": f"eq.{user_id}",
+            "company_name": f"eq.{company_name}",
+        },
+        timeout=30,
+    )
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"Failed to delete tracked company: {response.text}")
+
+    data = response.json()
+    return data if isinstance(data, list) else []
+
+
 def add_news_companies(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     if not items:
         return []

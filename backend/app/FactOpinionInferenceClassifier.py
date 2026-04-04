@@ -2,8 +2,10 @@ import json
 import re
 import sys
 
-from HaikuService import HaikuService
-from GeminiService import GeminiService
+try:
+    from app.HaikuService import HaikuService
+except ModuleNotFoundError:
+    from HaikuService import HaikuService
 
 class FactOpinionInferenceClassifier:
     SYSTEM_INSTRUCTION = """

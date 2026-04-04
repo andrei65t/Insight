@@ -9,6 +9,7 @@ from app.processCompany import process_company
 from app.NameSearcher import NameSearcher
 from app.supabase_auth import (
     add_tracked_company,
+    delete_tracked_company,
     get_user_from_access_token,
     list_tracked_companies,
 )
@@ -99,6 +100,27 @@ def track_company(payload: TrackCompanyRequest, authorization: str | None = Head
     except RuntimeError as exc:
         message = str(exc)
         logger.error("POST /tracking/companies failed: %s", message)
+        if "Invalid or expired access token" in message:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=message) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.delete("/tracking/companies/{company_name}")
+def untrack_company(company_name: str, authorization: str | None = Header(default=None)) -> Any:
+    token = _extract_bearer_token(authorization)
+    company_name = company_name.strip()
+
+    if not company_name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="company_name cannot be empty")
+
+    try:
+        user = get_user_from_access_token(token)
+        user_id = user["id"]
+        deleted = delete_tracked_company(user_id=user_id, company_name=company_name)
+        return {"deleted_count": len(deleted)}
+    except RuntimeError as exc:
+        message = str(exc)
+        logger.error("DELETE /tracking/companies failed: %s", message)
         if "Invalid or expired access token" in message:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=message) from exc
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

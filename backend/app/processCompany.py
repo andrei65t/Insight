@@ -1,6 +1,13 @@
-from NewsSearcher import search_news
-from SignalNoiseClassifier import SignalNoiseClassifier
-from FactOpinionInferenceClassifier import FactOpinionInferenceClassifier
+if __package__:
+    from app.NewsSearcher import search_news
+    from app.SignalNoiseClassifier import SignalNoiseClassifier
+    from app.FactOpinionInferenceClassifier import FactOpinionInferenceClassifier
+    from app.supabase_auth import add_news_companies
+else:
+    from NewsSearcher import search_news
+    from SignalNoiseClassifier import SignalNoiseClassifier
+    from FactOpinionInferenceClassifier import FactOpinionInferenceClassifier
+    from supabase_auth import add_news_companies
 import json
 import html
 import re
@@ -45,12 +52,6 @@ def signalClassifier(news_items: list, company_name: str) -> list:
 
 
 def add_news_to_supabase(news_items: list, company_name: str) -> list:
-    try:
-        from supabase_auth import add_news_companies
-    except ModuleNotFoundError as exc:
-        print(f"Supabase insert skipped (missing dependency): {exc}")
-        return []
-
     rows = []
     for item in news_items:
         classification = item.get("classification", {})

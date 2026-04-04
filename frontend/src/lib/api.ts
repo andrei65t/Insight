@@ -127,6 +127,21 @@ export const api = {
     return data.item;
   },
 
+  async deleteTrackedCompany(companyName: string): Promise<number> {
+    const encodedName = encodeURIComponent(companyName);
+    const response = await fetch(`${BASE_URL}/tracking/companies/${encodedName}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(await getErrorMessage(response, 'Failed to delete tracked company'));
+    }
+
+    const data = await response.json();
+    return Number(data.deleted_count ?? 0);
+  },
+
   async searchCompanyCandidates(query: string): Promise<CompanyCandidate[]> {
     const response = await fetch(`${BASE_URL}/tracking/company-search`, {
       method: 'POST',

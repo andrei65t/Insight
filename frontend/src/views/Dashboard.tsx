@@ -9,6 +9,7 @@ export const DashboardView: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [savingCandidateKeys, setSavingCandidateKeys] = useState<Set<string>>(new Set());
+  const [deletingTrackedKeys, setDeletingTrackedKeys] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
   const handleLogout = () => {
@@ -73,6 +74,27 @@ export const DashboardView: React.FC = () => {
       setSavingCandidateKeys((prev) => {
         const next = new Set(prev);
         next.delete(candidateKey);
+        return next;
+      });
+    }
+  };
+
+  const handleDeleteTrackedCompany = async (companyName: string, trackedKey: string) => {
+    setDeletingTrackedKeys((prev) => {
+      const next = new Set(prev);
+      next.add(trackedKey);
+      return next;
+    });
+    setError(null);
+    try {
+      await api.deleteTrackedCompany(companyName);
+      setTracked((prev) => prev.filter((x) => x.company_name.toLowerCase() !== companyName.toLowerCase()));
+    } catch {
+      setError('Nu am putut șterge compania din tracked list.');
+    } finally {
+      setDeletingTrackedKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(trackedKey);
         return next;
       });
     }
@@ -190,25 +212,48 @@ export const DashboardView: React.FC = () => {
                   <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500">#</th>
                   <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Company</th>
                   <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Tracked At</th>
+                  <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {tracked.length === 0 && !isLoading ? (
                   <tr>
-                    <td colSpan={3} className="py-6 text-sm text-slate-500">
+                    <td colSpan={4} className="py-6 text-sm text-slate-500">
                       Nu ai companii urmărite încă.
                     </td>
                   </tr>
                 ) : (
-                  tracked.map((item, idx) => (
-                    <tr key={item.id ?? `${item.company_name}-${idx}`} className="border-b border-slate-100">
-                      <td className="py-3 text-sm text-slate-600">{idx + 1}</td>
-                      <td className="py-3 text-sm font-medium text-slate-900">{item.company_name}</td>
-                      <td className="py-3 text-sm text-slate-600">
-                        {item.created_at ? new Date(item.created_at).toLocaleString() : '-'}
-                      </td>
-                    </tr>
-                  ))
+                  tracked.map((item, idx) => {
+                    const trackedKey = `${item.id ?? 'na'}-${item.company_name}`;
+                    const isDeleting = deletingTrackedKeys.has(trackedKey);
+                    return (
+                      <tr key={item.id ?? `${item.company_name}-${idx}`} className="border-b border-slate-100">
+                        <td className="py-3 text-sm text-slate-600">{idx + 1}</td>
+                        <td className="py-3 text-sm font-medium text-slate-900">{item.company_name}</td>
+                        <td className="py-3 text-sm text-slate-600">
+                          {item.created_at ? new Date(item.created_at).toLocaleString() : '-'}
+                        </td>
+                        <td className="py-3 text-sm text-slate-600">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                              Details
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteTrackedCompany(item.company_name, trackedKey)}
+                              disabled={isDeleting}
+                              className="rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-500 disabled:opacity-60"
+                            >
+                              {isDeleting ? 'Deleting...' : 'Delete'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
