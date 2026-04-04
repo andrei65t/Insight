@@ -37,7 +37,8 @@ Confidence must be an integer between 0 and 100.
         text: str,
         source_name: str = "Unknown",
         source_type: str = "unknown",
-        title: str = "Untitled"
+        title: str = "Untitled",
+        company: str = "Unknown",
     ) -> str:
         return f"""
 Classify the following item as Signal or Noise.
@@ -80,6 +81,7 @@ Now classify this item:
 
 Source: {source_name}
 Source type: {source_type}
+Company: {company}
 Title: {title}
 Text: {text}
 """
@@ -88,8 +90,8 @@ Text: {text}
         self,
         text: str,
         source_name: str = "Unknown",
-        source_type: str = "unknown",
-        title: str = "Untitled"
+        title: str = "Untitled",
+        company: str = "Untitled"
     ) -> dict:
         text = text.strip()
         if not text:
@@ -98,8 +100,8 @@ Text: {text}
         user_prompt = self.build_prompt(
             text=text,
             source_name=source_name,
-            source_type=source_type,
             title=title,
+            company=company,
         )
 
         raw_response = self.ai_service.send_prompt(
@@ -131,8 +133,8 @@ def main() -> None:
         result = classifier.classify(
             text=user_input,
             source_name="Reuters",
-            source_type="news_agency",
-            title="Company X shuts factory in Vietnam due to flooding"
+            title="Company X shuts factory in Vietnam due to flooding",
+            company = "X"
         )
     except Exception as exc:
         print(f"Eroare la clasificare: {exc}")

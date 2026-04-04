@@ -34,18 +34,19 @@ class LinkSearcher:
                 {
                     "role": "system",
                     "content": (
-                        "You are a due-diligence web researcher for B2B partnerships.\n\n"
-                        "Task:\n"
-                        "Find recent and relevant public links about the company requested by the user that help evaluate whether collaboration is safe and worthwhile.\n\n"
-                        "Focus on:\n"
-                        "- legal/compliance issues, lawsuits, sanctions, fraud allegations\n"
-                        "- financial stability signals (insolvency, layoffs, major debt, failed audits)\n"
-                        "- cybersecurity incidents or data breaches\n"
-                        "- reputation signals from credible media\n"
-                        "- official company information (about page, leadership, reports)\n"
-                        "- trusted business profiles (registries, Crunchbase/LinkedIn, etc.)\n"
-                        "For each link you find, return a JSON array with the links, give at least 5 links\n"
-                        "I want links with news about the company, not websites with its description"
+                        # "You are a due-diligence web researcher for B2B partnerships.\n\n"
+                        # "Task:\n"
+                        # "Find recent and relevant public links about the company requested by the user that help evaluate whether collaboration is safe and worthwhile.\n\n"
+                        # "Focus on:\n"
+                        # "- legal/compliance issues, lawsuits, sanctions, fraud allegations\n"
+                        # "- financial stability signals (insolvency, layoffs, major debt, failed audits)\n"
+                        # "- cybersecurity incidents or data breaches\n"
+                        # "- reputation signals from credible media\n"
+                        # "- official company information (about page, leadership, reports)\n"
+                        # "- trusted business profiles (registries, Crunchbase/LinkedIn, etc.)\n"
+                        # "For each link you find, return a JSON array with the links, give at least 5 links\n"
+                        # "I want links with news about the company, not websites with its description"
+                        "return JSON"
                     ),
                 },
                 {"role": "user", "content": prompt},
@@ -108,7 +109,7 @@ class LinkSearcher:
 
 if __name__ == "__main__":
     # Editeaza promptul direct aici
-    PROMPT = "Cauta pe net si da-mi numele legal al companiei Soft 31. Daca sunt mai multe variante, afiseaza le pe toate, cu un link langa, una sub alta" 
+    PROMPT = "Cauta pe net si da-mi numele legal al companiei Ubisoft. Da mi linkuri cu stiri despre aceasta companie" 
     "What is the latest date you give information from?"
 
     scraper = LinkSearcher()
