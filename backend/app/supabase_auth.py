@@ -2,7 +2,10 @@ from typing import Any, Dict, List
 
 import requests
 
-from app.config import settings
+try:
+    from app.config import settings
+except ModuleNotFoundError:
+    from config import settings
 
 
 def _supabase_headers() -> Dict[str, str]:
@@ -116,6 +119,27 @@ def list_tracked_companies(user_id: str) -> List[Dict[str, Any]]:
 
     if response.status_code >= 400:
         raise RuntimeError(f"Failed to fetch tracked companies: {response.text}")
+
+    data = response.json()
+    return data if isinstance(data, list) else []
+
+
+def add_news_companies(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not items:
+        return []
+
+    url = f"{settings.SUPABASE_URL}/rest/v1/news_companies"
+    headers = _supabase_service_headers(prefer="return=representation")
+
+    response = requests.post(
+        url,
+        headers=headers,
+        json=items,
+        timeout=30,
+    )
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"Failed to insert news_companies rows: {response.text}")
 
     data = response.json()
     return data if isinstance(data, list) else []

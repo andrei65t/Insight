@@ -1,4 +1,5 @@
 import json
+import re
 import sys
 
 from HaikuService import HaikuService
@@ -33,6 +34,37 @@ Confidence must be an integer between 0 and 100.
 
     def __init__(self):
         self.ai_service = HaikuService()
+
+    @staticmethod
+    def _parse_model_json(raw_response: str) -> dict | None:
+        # 1) Direct JSON
+        try:
+            parsed = json.loads(raw_response)
+            return parsed if isinstance(parsed, dict) else None
+        except json.JSONDecodeError:
+            pass
+
+        # 2) JSON fenced block
+        fenced = re.search(r"```json\s*(.*?)\s*```", raw_response, flags=re.DOTALL | re.IGNORECASE)
+        if fenced:
+            try:
+                parsed = json.loads(fenced.group(1))
+                return parsed if isinstance(parsed, dict) else None
+            except json.JSONDecodeError:
+                pass
+
+        # 3) First decodable JSON object found inside mixed text
+        decoder = json.JSONDecoder()
+        for idx, ch in enumerate(raw_response):
+            if ch not in "{[":
+                continue
+            try:
+                parsed, _ = decoder.raw_decode(raw_response[idx:])
+                return parsed if isinstance(parsed, dict) else None
+            except json.JSONDecodeError:
+                continue
+
+        return None
 
     def build_prompt(
         self,
@@ -109,9 +141,8 @@ Text: {text}
             system_instruction=self.SYSTEM_INSTRUCTION,
         )
 
-        try:
-            result = json.loads(raw_response)
-        except json.JSONDecodeError:
+        result = self._parse_model_json(raw_response)
+        if result is None:
             return {
                 "label": "Unknown",
                 "confidence": 0,

@@ -91,7 +91,8 @@ Text: {text}
         text: str,
         source_name: str = "Unknown",
         title: str = "Untitled",
-        company: str = "Untitled"
+        company: str = "Untitled",
+        link: str = "",
     ) -> dict:
         text = text.strip()
         if not text:
@@ -116,9 +117,11 @@ Text: {text}
                 "label": "Unknown",
                 "confidence": 0,
                 "reason": "Model response was not valid JSON.",
+                "link": link,
                 "raw_response": raw_response,
             }
 
+        result["link"] = link
         return result
 
 
