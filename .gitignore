@@ -1,0 +1,67 @@
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+.pnpm-debug.log
+
+# React / Vite build output
+dist/
+dist-ssr/
+build/
+frontend/dist/
+frontend/build/
+
+# Python / FastAPI
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env_python/
+ENV/
+
+# Environment Variables
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+.env.example
+
+# Supabase / DB related logic
+*.sqlite3
+*.db
+pgadmin_data/
+postgres_data/
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# OS files
+Thumbs.db
