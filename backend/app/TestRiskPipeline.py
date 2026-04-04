@@ -1,9 +1,9 @@
 import json
 
-from RiskRelevanceClassifier import RiskRelevanceClassifier
-from RiskRadarClassifier import RiskRadarClassifier
-from PoliticalImpactClassifier import PoliticalImpactClassifier
-from RiskReportAggregator import RiskReportAggregator
+from Classifier.RiskRelevanceClassifier import RiskRelevanceClassifier
+from Classifier.RiskRadarClassifier import RiskRadarClassifier
+from Classifier.PoliticalImpactClassifier import PoliticalImpactClassifier
+from Classifier.RiskReportAggregator import RiskReportAggregator
 
 
 TEST_CASES = [
@@ -14,20 +14,20 @@ TEST_CASES = [
     #     "title": "Soft 31 delays two software deliveries for manufacturing clients",
     #     "text": "Soft 31 delayed two client software deployments after a staffing shortage affected implementation teams."
     # },
-    # {
-    #     "company_name": "Soft 31",
-    #     "source_name": "Government Bulletin",
-    #     "source_type": "official_report",
-    #     "title": "New labor rules increase compliance requirements for staffing-heavy service providers",
-    #     "text": "Authorities announced stricter labor compliance checks and overtime documentation requirements for staffing-heavy service providers starting next quarter."
-    # },
     {
         "company_name": "Soft 31",
-        "source_name": "Company Blog",
-        "source_type": "official_company_site",
-        "title": "Soft 31 launches new AI integration service",
-        "text": "Soft 31 announced a new AI integration service for logistics customers."
+        "source_name": "Government Bulletin",
+        "source_type": "official_report",
+        "title": "New labor rules increase compliance requirements for staffing-heavy service providers",
+        "text": "Authorities announced stricter labor compliance checks and overtime documentation requirements for staffing-heavy service providers starting next quarter."
     },
+    # {
+    #     "company_name": "Soft 31",
+    #     "source_name": "Company Blog",
+    #     "source_type": "official_company_site",
+    #     "title": "Soft 31 launches new AI integration service",
+    #     "text": "Soft 31 announced a new AI integration service for logistics customers."
+    # },
 ]
 
 

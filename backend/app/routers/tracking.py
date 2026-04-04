@@ -4,7 +4,9 @@ from typing import Any
 from fastapi import APIRouter, Header, HTTPException, status
 from pydantic import BaseModel, Field
 
-from app.WebSearcher import WebSearcher
+from app.processCompany import process_company
+
+from app.NameSearcher import NameSearcher
 from app.supabase_auth import (
     add_tracked_company,
     get_user_from_access_token,
@@ -91,6 +93,8 @@ def track_company(payload: TrackCompanyRequest, authorization: str | None = Head
         user = get_user_from_access_token(token)
         user_id = user["id"]
         item = add_tracked_company(user_id=user_id, company_name=company_name)
+
+        process_company(company_name)
         return {"item": item}
     except RuntimeError as exc:
         message = str(exc)
@@ -112,7 +116,7 @@ def search_company_candidates(payload: CompanySearchRequest, authorization: str 
         # Validate token first to keep the route consistent with other tracking endpoints.
         get_user_from_access_token(token)
 
-        searcher = WebSearcher()
+        searcher = NameSearcher()
         api_result = searcher.search_web_info(query)
         parsed = searcher._extract_json_content(api_result)
         contenders = _normalize_contenders(parsed)

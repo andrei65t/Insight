@@ -1,4 +1,6 @@
 import os
+import json
+import re
 from pathlib import Path
 
 import requests
@@ -8,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 
-class WebScraper:
+class LinkSearcher:
     def __init__(self, api_key: str | None = None):
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
         if not self.api_key:
@@ -20,7 +22,7 @@ class WebScraper:
             "google/gemma-4-26b-a4b-it",
         ]
 
-    def _call_model(self, model_id: str, prompt: str) -> str:
+    def _call_model(self, model_id: str, prompt: str) -> dict:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -32,8 +34,18 @@ class WebScraper:
                 {
                     "role": "system",
                     "content": (
-                        #"Find up-to-date public information about the company using web sources. "
-                        #"Return concise bullet points and include source links."
+                        "You are a due-diligence web researcher for B2B partnerships.\n\n"
+                        "Task:\n"
+                        "Find recent and relevant public links about the company requested by the user that help evaluate whether collaboration is safe and worthwhile.\n\n"
+                        "Focus on:\n"
+                        "- legal/compliance issues, lawsuits, sanctions, fraud allegations\n"
+                        "- financial stability signals (insolvency, layoffs, major debt, failed audits)\n"
+                        "- cybersecurity incidents or data breaches\n"
+                        "- reputation signals from credible media\n"
+                        "- official company information (about page, leadership, reports)\n"
+                        "- trusted business profiles (registries, Crunchbase/LinkedIn, etc.)\n"
+                        "For each link you find, return a JSON array with the links, give at least 5 links\n"
+                        "I want links with news about the company, not websites with its description"
                     ),
                 },
                 {"role": "user", "content": prompt},
@@ -50,11 +62,26 @@ class WebScraper:
             raise RuntimeError(f"{response.status_code} {response.text}")
 
         data = response.json()
-        return data["choices"][0]["message"]["content"]
+        return self._extract_json_content(data)
 
     @staticmethod
-    def _looks_like_cutoff_response(text: str) -> bool:
-        lowered = text.lower()
+    def _extract_json_content(api_response: dict) -> dict:
+        content = api_response["choices"][0]["message"]["content"]
+        if isinstance(content, dict):
+            return content
+        if not isinstance(content, str):
+            raise ValueError("Unexpected content type in model response.")
+
+        cleaned = content.strip()
+        match = re.search(r"```json\s*(.*?)\s*```", cleaned, flags=re.DOTALL | re.IGNORECASE)
+        if match:
+            cleaned = match.group(1).strip()
+
+        return json.loads(cleaned)
+
+    @staticmethod
+    def _looks_like_cutoff_response(text: str | dict) -> bool:
+        lowered = text.lower() if isinstance(text, str) else json.dumps(text).lower()
         return (
             "knowledge cutoff" in lowered
             or "my knowledge is current up to" in lowered
@@ -62,7 +89,7 @@ class WebScraper:
             or "up to 2023" in lowered
         )
 
-    def search_company_info(self, prompt: str) -> str:
+    def search_company_info(self, prompt: str) -> dict:
         last_error = ""
 
         for model in self.model_candidates:
@@ -84,7 +111,7 @@ if __name__ == "__main__":
     PROMPT = "Cauta pe net si da-mi numele legal al companiei Soft 31. Daca sunt mai multe variante, afiseaza le pe toate, cu un link langa, una sub alta" 
     "What is the latest date you give information from?"
 
-    scraper = WebScraper()
+    scraper = LinkSearcher()
     result = scraper.search_company_info(PROMPT)
     print("\n=== WEB RESEARCH RESULT ===\n")
-    print(result)
+    print(json.dumps(result, ensure_ascii=False, indent=2))

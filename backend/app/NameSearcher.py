@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-class WebSearcher:
+class NameSearcher:
     def __init__(self, api_key: str | None = None):
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
         if not self.api_key:
@@ -92,6 +92,6 @@ if __name__ == "__main__":
     # Editeaza promptul direct aici
     PROMPT = "SOFT 31"
 
-    searcher = WebSearcher()
+    searcher = NameSearcher()
     result = searcher.search_web_info(PROMPT)
     print(json.dumps(searcher._extract_json_content(result), ensure_ascii=False, indent=2))
