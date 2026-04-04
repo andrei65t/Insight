@@ -34,20 +34,21 @@ class WebSearcher:
                 {
                     "role": "system",
                     "content": (
-                        "Find the legal name of the company the user requested in JSON format in a vector node named contenders."
-                        "If there are more of them put all of them in the JSON."
-                        "If the requested input is not a company name, return a JSON node 'error' saying 'you can only search companies'"
-                        "In each contender node, return just the legal name of the company and their website."
-                        "Return the candidates from all countries"
+                        "Find the official registered legal name of the company the user requested in JSON format in a vector node named contenders.\n"
+                        "including legal suffix\n"
+                        "For example: Mister Delivery SRL"
+                        "If there are more of them put all of them in the JSON.\n"
+                        "If the requested input is not a company name, return a JSON node 'error' saying 'you can only search companies'\n"
+                        "In each contender node, return just the legal name of the company and their website.\n"
+                        "Return the candidates from all countries\n"
                     ),
                 },
                 {"role": "user", "content": prompt},
             ],
-            "temperature": 0.1,
+            "temperature": 0.2,
             "plugins": [{"id": "web"}],
+            "web_search_options": {"search_context_size": "high"},
         }
-        if model_id.startswith("openai/"):
-            payload["web_search_options"] = {"search_context_size": "high"}
 
         response = requests.post(self.endpoint, headers=headers, json=payload, timeout=90)
 
@@ -89,7 +90,7 @@ class WebSearcher:
 
 if __name__ == "__main__":
     # Editeaza promptul direct aici
-    PROMPT = "Soft 31"
+    PROMPT = "SOFT 31"
 
     searcher = WebSearcher()
     result = searcher.search_web_info(PROMPT)

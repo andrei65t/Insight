@@ -1,8 +1,10 @@
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, status
 from pydantic import BaseModel, Field
 
+from app.WebSearcher import WebSearcher
 from app.supabase_auth import (
     add_tracked_company,
     get_user_from_access_token,
@@ -10,10 +12,40 @@ from app.supabase_auth import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class TrackCompanyRequest(BaseModel):
     company_name: str = Field(min_length=1, max_length=200)
+
+
+class CompanySearchRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=200)
+
+
+def _normalize_contenders(payload: dict) -> list[dict[str, str]]:
+    contenders = payload.get("contenders", [])
+    if not isinstance(contenders, list):
+        return []
+
+    normalized: list[dict[str, str]] = []
+    for item in contenders:
+        if not isinstance(item, dict):
+            continue
+        name = (
+            item.get("full_legal_name")
+            or item.get("legal_name")
+            or item.get("company_name")
+            or ""
+        )
+        website = item.get("website") or ""
+        name = str(name).strip()
+        website = str(website).strip()
+        if not name:
+            continue
+        normalized.append({"name": name, "website": website})
+
+    return normalized
 
 
 def _extract_bearer_token(authorization: str | None) -> str:
@@ -40,6 +72,10 @@ def get_tracked_companies(authorization: str | None = Header(default=None)) -> A
         companies = list_tracked_companies(user_id)
         return {"items": companies}
     except RuntimeError as exc:
+        message = str(exc)
+        logger.error("GET /tracking/companies failed: %s", message)
+        if "Invalid or expired access token" in message:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=message) from exc
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
@@ -57,4 +93,35 @@ def track_company(payload: TrackCompanyRequest, authorization: str | None = Head
         item = add_tracked_company(user_id=user_id, company_name=company_name)
         return {"item": item}
     except RuntimeError as exc:
+        message = str(exc)
+        logger.error("POST /tracking/companies failed: %s", message)
+        if "Invalid or expired access token" in message:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=message) from exc
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post("/tracking/company-search")
+def search_company_candidates(payload: CompanySearchRequest, authorization: str | None = Header(default=None)) -> Any:
+    token = _extract_bearer_token(authorization)
+    query = payload.query.strip()
+
+    if not query:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="query cannot be empty")
+
+    try:
+        # Validate token first to keep the route consistent with other tracking endpoints.
+        get_user_from_access_token(token)
+
+        searcher = WebSearcher()
+        api_result = searcher.search_web_info(query)
+        parsed = searcher._extract_json_content(api_result)
+        contenders = _normalize_contenders(parsed)
+        return {"items": contenders}
+    except RuntimeError as exc:
+        message = str(exc)
+        logger.error("POST /tracking/company-search failed: %s", message)
+        if "Invalid or expired access token" in message:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=message) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Search failed: {exc}") from exc

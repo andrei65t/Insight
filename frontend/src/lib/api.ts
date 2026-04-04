@@ -19,6 +19,11 @@ type TrackedCompany = {
   created_at?: string;
 };
 
+type CompanyCandidate = {
+  name: string;
+  website: string;
+};
+
 function authHeaders(): HeadersInit {
   const token = localStorage.getItem('token');
   const headers: Record<string, string> = {
@@ -28,6 +33,27 @@ function authHeaders(): HeadersInit {
     headers.Authorization = `Bearer ${token}`;
   }
   return headers;
+}
+
+async function getErrorMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const data = await response.json();
+    if (typeof data?.detail === 'string' && data.detail.trim()) {
+      return data.detail;
+    }
+    if (typeof data?.message === 'string' && data.message.trim()) {
+      return data.message;
+    }
+    if (typeof data?.error_description === 'string' && data.error_description.trim()) {
+      return data.error_description;
+    }
+    if (typeof data?.error === 'string' && data.error.trim()) {
+      return data.error;
+    }
+  } catch {
+    // Ignore parse errors and return fallback.
+  }
+  return fallback;
 }
 
 export const api = {
@@ -42,7 +68,7 @@ export const api = {
     });
 
     if (!response.ok) {
-      throw new Error('Login failed');
+      throw new Error(await getErrorMessage(response, 'Login failed'));
     }
 
     const data: LoginResponse = await response.json();
@@ -62,7 +88,7 @@ export const api = {
     });
 
     if (!response.ok) {
-      throw new Error('Register failed');
+      throw new Error(await getErrorMessage(response, 'Register failed'));
     }
 
     const data = await response.json();
@@ -79,7 +105,7 @@ export const api = {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to load tracked companies');
+      throw new Error(await getErrorMessage(response, 'Failed to load tracked companies'));
     }
 
     const data = await response.json();
@@ -94,11 +120,26 @@ export const api = {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to track company');
+      throw new Error(await getErrorMessage(response, 'Failed to track company'));
     }
 
     const data = await response.json();
     return data.item;
+  },
+
+  async searchCompanyCandidates(query: string): Promise<CompanyCandidate[]> {
+    const response = await fetch(`${BASE_URL}/tracking/company-search`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ query }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await getErrorMessage(response, 'Failed to search company candidates'));
+    }
+
+    const data = await response.json();
+    return data.items ?? [];
   },
 
   logout() {
@@ -109,3 +150,5 @@ export const api = {
     return localStorage.getItem('token');
   },
 };
+
+export type { CompanyCandidate, TrackedCompany };

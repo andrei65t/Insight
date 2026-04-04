@@ -29,8 +29,9 @@ export const RegisterView: React.FC = () => {
 
       setSuccess('Cont creat. Verifica email-ul pentru confirmare, apoi autentifica-te.');
       setIsLoading(false);
-    } catch {
-      setError('Register failed. Verifica datele si incearca din nou.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Register failed. Verifica datele si incearca din nou.';
+      setError(message);
       setIsLoading(false);
     }
   };

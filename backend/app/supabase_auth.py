@@ -14,9 +14,13 @@ def _supabase_headers() -> Dict[str, str]:
 
 
 def _supabase_service_headers(prefer: str | None = None) -> Dict[str, str]:
+    service_key = settings.SUPABASE_SERVICE_ROLE_KEY.strip()
+    if not service_key or service_key == "SECRET_KEY":
+        raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY is missing. Set it in backend/.env.")
+
     headers = {
-        "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
-        "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
+        "apikey": service_key,
+        "Authorization": f"Bearer {service_key}",
         "Content-Type": "application/json",
     }
     if prefer:

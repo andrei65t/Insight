@@ -15,8 +15,9 @@ export const LoginView: React.FC = () => {
     try {
       await api.login(email, password);
       window.location.href = '/dashboard';
-    } catch {
-      setError('Invalid email or password');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Invalid email or password';
+      setError(message);
       setIsLoading(false);
     }
   };

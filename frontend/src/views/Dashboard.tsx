@@ -1,18 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { api } from '../lib/api';
-
-type TrackedCompany = {
-  id: number;
-  company_name: string;
-  created_at?: string;
-};
+import { api, type CompanyCandidate, type TrackedCompany } from '../lib/api';
 
 export const DashboardView: React.FC = () => {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [candidates, setCandidates] = useState<CompanyCandidate[]>([]);
   const [tracked, setTracked] = useState<TrackedCompany[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [savingCandidateKeys, setSavingCandidateKeys] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
   const handleLogout = () => {
@@ -37,12 +33,32 @@ export const DashboardView: React.FC = () => {
     loadTrackedCompanies();
   }, []);
 
-  const handleTrackCompany = async (e: React.FormEvent) => {
+  const handleSearchCompanies = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = search.trim();
     if (!name) return;
 
-    setIsSaving(true);
+    setIsSearching(true);
+    setError(null);
+    try {
+      const items = await api.searchCompanyCandidates(name);
+      setCandidates(items);
+    } catch {
+      setError('Nu am putut căuta candidații pentru companie.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleTrackCompany = async (companyName: string, candidateKey: string) => {
+    const name = companyName.trim();
+    if (!name) return;
+
+    setSavingCandidateKeys((prev) => {
+      const next = new Set(prev);
+      next.add(candidateKey);
+      return next;
+    });
     setError(null);
     try {
       const item = await api.trackCompany(name);
@@ -51,11 +67,14 @@ export const DashboardView: React.FC = () => {
         if (exists) return prev;
         return [item, ...prev];
       });
-      setSearch('');
     } catch {
       setError('Nu am putut salva compania în tracked list.');
     } finally {
-      setIsSaving(false);
+      setSavingCandidateKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(candidateKey);
+        return next;
+      });
     }
   };
 
@@ -86,7 +105,7 @@ export const DashboardView: React.FC = () => {
         </header>
 
         <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm mb-8">
-          <form onSubmit={handleTrackCompany} className="flex flex-col sm:flex-row gap-3">
+          <form onSubmit={handleSearchCompanies} className="flex flex-col sm:flex-row gap-3">
             <input
               type="text"
               placeholder="Ex: NVIDIA, Tesla, Microsoft"
@@ -96,12 +115,60 @@ export const DashboardView: React.FC = () => {
             />
             <button
               type="submit"
-              disabled={isSaving}
+              disabled={isSearching}
               className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
             >
-              {isSaving ? 'Adding...' : 'Track Company'}
+              {isSearching ? 'Searching...' : 'Search Company'}
             </button>
           </form>
+        </section>
+
+        <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold text-slate-900">Search Results</h3>
+            {isSearching && <span className="text-sm text-slate-500">Searching...</span>}
+          </div>
+
+          {candidates.length === 0 && !isSearching ? (
+            <p className="text-sm text-slate-500">Nu există rezultate încă. Caută o companie mai sus.</p>
+          ) : (
+            <div className="space-y-3">
+              {candidates.map((candidate, idx) => {
+                const candidateKey = `${candidate.name}-${candidate.website}-${idx}`;
+                const isSavingCandidate = savingCandidateKeys.has(candidateKey);
+                return (
+                  <div
+                    key={candidateKey}
+                    className="flex flex-col gap-2 rounded-xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-900">{candidate.name}</p>
+                      {candidate.website ? (
+                        <a
+                          href={candidate.website}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sm text-blue-600 hover:text-blue-500 break-all"
+                        >
+                          {candidate.website}
+                        </a>
+                      ) : (
+                        <p className="text-sm text-slate-500">No website available</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleTrackCompany(candidate.name, candidateKey)}
+                      disabled={isSavingCandidate}
+                      className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                    >
+                      {isSavingCandidate ? 'Adding...' : 'Track'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
 
         <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
