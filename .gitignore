@@ -1,31 +1,19 @@
-# Node.js
-node_modules/
-npm-debug.log
-yarn-error.log
-yarn-debug.log
-.pnpm-debug.log
-
-# React / Vite build output
-dist/
-dist-ssr/
-build/
-frontend/dist/
-frontend/build/
-
-# Python / FastAPI
+# --- Python / Backend ---
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
 env/
+venv/
+.venv/
 build/
 develop-eggs/
 dist/
 downloads/
 eggs/
 .eggs/
-lib/
+
 lib64/
 parts/
 sdist/
@@ -34,34 +22,52 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+.pytest_cache/
+.mypy_cache/
 
-# Virtual environments
-venv/
-.venv/
-env/
-.env_python/
-ENV/
+# --- Node / Frontend ---
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/stats.html
+.eslintcache
+.stylelintcache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
-# Environment Variables
+# --- Databases & Docker Volumes ---
+*.db
+*.sqlite3
+local.db
+backend/local.db
+postgres_data/
+pgadmin_data/
+
+# --- Environment & Secrets ---
 .env
+.env.local
 .env.development.local
 .env.test.local
 .env.production.local
-.env.local
-.env.example
+*.secret
+# Note: DO NOT ignore .env.example
 
-# Supabase / DB related logic
-*.sqlite3
-*.db
-pgadmin_data/
-postgres_data/
-
-# IDEs and Editors
+# --- IDEs / Editors ---
 .vscode/
 .idea/
 *.swp
 *.swo
-.DS_Store
+.project
+.pydevproject
+.settings/
 
-# OS files
+# --- OS / Misc ---
+.DS_Store
 Thumbs.db
+.cache/
+.docker/
+
+# --- Hackathon ---
+'Hackathon Challenge Brief - RO.pdf'
