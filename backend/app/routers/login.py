@@ -3,10 +3,10 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
-from app.core import security
-from app.core.config import settings
+from app import security
+from app.config import settings
 from app.models import User
-from app.db.session import get_db
+from app.database import get_db
 
 router = APIRouter()
 

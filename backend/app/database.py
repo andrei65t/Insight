@@ -1,7 +1,7 @@
 import os
 import time
 from sqlmodel import Session, create_engine, select, SQLModel
-from app.core.config import settings
+from app.config import settings
 
 DATABASE_URL = os.getenv("DATABASE_URL", settings.SQLALCHEMY_DATABASE_URI)
 
@@ -25,7 +25,7 @@ def init_db():
             time.sleep(2)
     
     from app.models import User
-    from app.core.security import get_password_hash
+    from app.security import get_password_hash
     with Session(engine) as session:
         user = session.exec(select(User).where(User.email == "admin@example.com")).first()
         if not user:
