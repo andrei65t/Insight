@@ -26,7 +26,7 @@ export const LoginView: React.FC = () => {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm bg-white p-8 rounded-xl shadow-sm border border-slate-200">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">TrustScope</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Insight</h1>
           <p className="text-slate-500 mt-1">Login</p>
         </div>
 
@@ -76,7 +76,7 @@ export const LoginView: React.FC = () => {
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-6 uppercase tracking-widest font-bold">
-          TrustScope
+          Insight
         </p>
       </div>
     </div>
