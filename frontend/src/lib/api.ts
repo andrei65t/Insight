@@ -24,6 +24,28 @@ type CompanyCandidate = {
   website: string;
 };
 
+type CompanyNewsItem = {
+  id: number;
+  company: string;
+  title: string;
+  link: string;
+  source: string;
+  date?: string;
+  fact_label: string;
+};
+
+type CompanyDetails = {
+  tracked_company: TrackedCompany;
+  news: CompanyNewsItem[];
+  summary: {
+    total_news: number;
+    factual_count: number;
+    opinion_count: number;
+    inference_count: number;
+    latest_date?: string | null;
+  };
+};
+
 function authHeaders(): HeadersInit {
   const token = localStorage.getItem('token');
   const headers: Record<string, string> = {
@@ -157,6 +179,34 @@ export const api = {
     return data.items ?? [];
   },
 
+  async getCompanyDetails(companyName: string): Promise<CompanyDetails> {
+    const encodedName = encodeURIComponent(companyName);
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+
+    let response: Response;
+    try {
+      response = await fetch(`${BASE_URL}/tracking/companies/${encodedName}/details`, {
+        method: 'GET',
+        headers: authHeaders(),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Request timeout while loading company details');
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+
+    if (!response.ok) {
+      throw new Error(await getErrorMessage(response, 'Failed to load company details'));
+    }
+
+    return await response.json();
+  },
+
   logout() {
     localStorage.removeItem('token');
   },
@@ -167,3 +217,4 @@ export const api = {
 };
 
 export type { CompanyCandidate, TrackedCompany };
+export type { CompanyDetails, CompanyNewsItem };

@@ -124,6 +124,70 @@ def list_tracked_companies(user_id: str) -> List[Dict[str, Any]]:
     return data if isinstance(data, list) else []
 
 
+def get_tracked_company(user_id: str, company_name: str) -> Dict[str, Any] | None:
+    url = f"{settings.SUPABASE_URL}/rest/v1/{settings.TRACKING_TABLE}"
+    response = requests.get(
+        url,
+        headers=_supabase_service_headers(),
+        params={
+            "select": "id,company_name,created_at",
+            "user_id": f"eq.{user_id}",
+            "company_name": f"eq.{company_name}",
+            "limit": "1",
+        },
+        timeout=30,
+    )
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"Failed to fetch tracked company: {response.text}")
+
+    data = response.json()
+    if isinstance(data, list) and data:
+        return data[0]
+    return None
+
+
+def list_company_news(company_name: str, limit: int = 100) -> List[Dict[str, Any]]:
+    url = f"{settings.SUPABASE_URL}/rest/v1/news_companies"
+    response = requests.get(
+        url,
+        headers=_supabase_service_headers(),
+        params={
+            "select": "id,company,title,link,source,date,fact_label",
+            "company": f"eq.{company_name}",
+            "order": "date.desc.nullslast,id.desc",
+            "limit": str(limit),
+        },
+        timeout=30,
+    )
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"Failed to fetch company news: {response.text}")
+
+    data = response.json()
+    if isinstance(data, list) and data:
+        return data
+
+    # Fallback for historical rows that may differ only by casing (e.g., nike vs Nike).
+    fallback_response = requests.get(
+        url,
+        headers=_supabase_service_headers(),
+        params={
+            "select": "id,company,title,link,source,date,fact_label",
+            "company": f"ilike.{company_name}",
+            "order": "date.desc.nullslast,id.desc",
+            "limit": str(limit),
+        },
+        timeout=30,
+    )
+
+    if fallback_response.status_code >= 400:
+        raise RuntimeError(f"Failed to fetch company news (fallback): {fallback_response.text}")
+
+    fallback_data = fallback_response.json()
+    return fallback_data if isinstance(fallback_data, list) else []
+
+
 def delete_tracked_company(user_id: str, company_name: str) -> List[Dict[str, Any]]:
     url = f"{settings.SUPABASE_URL}/rest/v1/{settings.TRACKING_TABLE}"
     response = requests.delete(

@@ -4,4 +4,4 @@ pydantic-settings
 python-multipart
 requests
 genai
-dotenv
+python-dotenv

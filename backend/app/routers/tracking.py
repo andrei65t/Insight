@@ -10,12 +10,25 @@ from app.NameSearcher import NameSearcher
 from app.supabase_auth import (
     add_tracked_company,
     delete_tracked_company,
+    get_tracked_company,
     get_user_from_access_token,
+    list_company_news,
     list_tracked_companies,
 )
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _normalize_fact_label(value: str) -> str:
+    lowered = str(value or "").strip().lower()
+    if lowered.startswith("fact") or lowered == "factual":
+        return "Fact"
+    if lowered.startswith("opinion"):
+        return "Opinion"
+    if lowered.startswith("inference"):
+        return "Inference"
+    return "Inference"
 
 
 class TrackCompanyRequest(BaseModel):
@@ -151,3 +164,61 @@ def search_company_candidates(payload: CompanySearchRequest, authorization: str 
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Search failed: {exc}") from exc
+
+
+@router.get("/tracking/companies/{company_name}/details")
+def get_company_details(company_name: str, authorization: str | None = Header(default=None)) -> Any:
+    token = _extract_bearer_token(authorization)
+    company_name = company_name.strip()
+
+    if not company_name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="company_name cannot be empty")
+
+    try:
+        user = get_user_from_access_token(token)
+        user_id = user["id"]
+
+        tracked_item = get_tracked_company(user_id=user_id, company_name=company_name)
+        if not tracked_item:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company is not in tracked list")
+
+        raw_news_rows = list_company_news(company_name=company_name, limit=200)
+        news_rows = []
+        factual_count = 0
+        opinion_count = 0
+        inference_count = 0
+
+        for row in raw_news_rows:
+            normalized_label = _normalize_fact_label(row.get("fact_label", ""))
+            enriched = dict(row)
+            enriched["fact_label"] = normalized_label
+            news_rows.append(enriched)
+
+            if normalized_label == "Fact":
+                factual_count += 1
+            elif normalized_label == "Opinion":
+                opinion_count += 1
+            else:
+                inference_count += 1
+
+        latest_date = next((row.get("date") for row in news_rows if row.get("date")), None)
+
+        return {
+            "tracked_company": tracked_item,
+            "news": news_rows,
+            "summary": {
+                "total_news": len(news_rows),
+                "factual_count": factual_count,
+                "opinion_count": opinion_count,
+                "inference_count": inference_count,
+                "latest_date": latest_date,
+            },
+        }
+    except HTTPException:
+        raise
+    except RuntimeError as exc:
+        message = str(exc)
+        logger.error("GET /tracking/companies/{company_name}/details failed: %s", message)
+        if "Invalid or expired access token" in message:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=message) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { api, type CompanyCandidate, type TrackedCompany } from '../lib/api';
 
+const normalizeCompanyName = (value: string) => value.trim().toLowerCase();
+
 export const DashboardView: React.FC = () => {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -64,10 +66,11 @@ export const DashboardView: React.FC = () => {
     try {
       const item = await api.trackCompany(name);
       setTracked((prev) => {
-        const exists = prev.some((x) => x.company_name.toLowerCase() === item.company_name.toLowerCase());
+        const exists = prev.some((x) => normalizeCompanyName(x.company_name) === normalizeCompanyName(item.company_name));
         if (exists) return prev;
         return [item, ...prev];
       });
+      setCandidates((prev) => prev.filter((candidate) => normalizeCompanyName(candidate.name) !== normalizeCompanyName(item.company_name)));
     } catch {
       setError('Nu am putut salva compania în tracked list.');
     } finally {
@@ -98,6 +101,12 @@ export const DashboardView: React.FC = () => {
         return next;
       });
     }
+  };
+
+  const handleOpenDetails = (companyName: string) => {
+    const encodedName = encodeURIComponent(companyName);
+    window.history.pushState({}, '', `/dashboard?company=${encodedName}`);
+    window.dispatchEvent(new PopStateEvent('popstate'));
   };
 
   return (
@@ -151,11 +160,13 @@ export const DashboardView: React.FC = () => {
             {isSearching && <span className="text-sm text-slate-500">Searching...</span>}
           </div>
 
-          {candidates.length === 0 && !isSearching ? (
+          {candidates.filter((candidate) => !tracked.some((item) => normalizeCompanyName(item.company_name) === normalizeCompanyName(candidate.name))).length === 0 && !isSearching ? (
             <p className="text-sm text-slate-500">Nu există rezultate încă. Caută o companie mai sus.</p>
           ) : (
             <div className="space-y-3">
-              {candidates.map((candidate, idx) => {
+              {candidates
+                .filter((candidate) => !tracked.some((item) => normalizeCompanyName(item.company_name) === normalizeCompanyName(candidate.name)))
+                .map((candidate, idx) => {
                 const candidateKey = `${candidate.name}-${candidate.website}-${idx}`;
                 const isSavingCandidate = savingCandidateKeys.has(candidateKey);
                 return (
@@ -188,7 +199,7 @@ export const DashboardView: React.FC = () => {
                     </button>
                   </div>
                 );
-              })}
+                })}
             </div>
           )}
         </section>
@@ -237,6 +248,7 @@ export const DashboardView: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
+                              onClick={() => handleOpenDetails(item.company_name)}
                               className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                             >
                               Details

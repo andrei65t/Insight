@@ -42,8 +42,6 @@ yarn-error.log*
 *.sqlite3
 local.db
 backend/local.db
-postgres_data/
-pgadmin_data/
 
 # --- Environment & Secrets ---
 .env
