@@ -1,17 +1,21 @@
 if __package__:
     from app.NewsSearcher import search_news
-    from app.SignalNoiseClassifier import SignalNoiseClassifier
-    from app.FactOpinionInferenceClassifier import FactOpinionInferenceClassifier
+    from app.Classifier.SignalNoiseClassifier import SignalNoiseClassifier
+    from app.Classifier.FactOpinionInferenceClassifier import FactOpinionInferenceClassifier
     from app.supabase_auth import add_news_companies
 else:
     from NewsSearcher import search_news
-    from SignalNoiseClassifier import SignalNoiseClassifier
-    from FactOpinionInferenceClassifier import FactOpinionInferenceClassifier
+    from Classifier.SignalNoiseClassifier import SignalNoiseClassifier
+    from Classifier.FactOpinionInferenceClassifier import FactOpinionInferenceClassifier
     from supabase_auth import add_news_companies
 import json
 import html
 import re
 import requests
+import os
+
+
+HF_SUMMARY_API_URL = "https://router.huggingface.co/hf-inference/models/facebook/bart-large-cnn"
 
 
 def signalClassifier(news_items: list, company_name: str) -> list:
@@ -20,13 +24,16 @@ def signalClassifier(news_items: list, company_name: str) -> list:
 
     for item in news_items:
         title = item.get("title", "")
-        text = item.get("snippet", "")
+        snippet = item.get("snippet", "")
         source_name = item.get("source", "Unknown")
         link = item.get("link", "")
         date = item.get("date")
 
-        # Some providers return empty snippet; fallback to title so the signal model can still run.
-        classify_text = str(text or title).strip()
+        page_html = _fetch_link_html(link)
+        full_text = _html_to_clean_text(page_html)[:12000]
+
+        # Use full article text first; fallback to snippet/title only if fetch/parse fails.
+        classify_text = str(full_text or snippet or title).strip()
         if not classify_text:
             continue
 
@@ -45,7 +52,7 @@ def signalClassifier(news_items: list, company_name: str) -> list:
             {
                 "company": company_name,
                 "title": title,
-                "text": text,
+                "text": classify_text,
                 "link": link,
                 "date": date,
                 "source": source_name,
@@ -123,21 +130,52 @@ def _html_to_clean_text(raw_html: str) -> str:
     return text.strip()
 
 
+def summarize_text(text: str) -> str:
+    text = str(text or "").strip()
+    if not text:
+        return ""
+
+    hf_token = os.environ.get("HF_TOKEN", "").strip()
+    if not hf_token:
+        return text
+
+    headers = {"Authorization": f"Bearer {hf_token}"}
+    payload = {"inputs": text}
+
+    try:
+        response = requests.post(
+            HF_SUMMARY_API_URL,
+            headers=headers,
+            json=payload,
+            timeout=45,
+        )
+        response.raise_for_status()
+        data = response.json()
+    except Exception:
+        return text
+
+    if isinstance(data, list) and data:
+        first = data[0]
+        if isinstance(first, dict):
+            summary = str(first.get("summary_text", "")).strip()
+            if summary:
+                return summary
+
+    if isinstance(data, dict):
+        summary = str(data.get("summary_text", "")).strip()
+        if summary:
+            return summary
+
+    return text
+
+
 def FactClassifier(items: list) -> list:
     classifier = FactOpinionInferenceClassifier()
 
     for item in items:
         title = item.get("title", "Untitled")
         source = item.get("source", "Unknown")
-        link = item.get("link", "")
-
-        page_html = _fetch_link_html(link)
-        clean_text = _html_to_clean_text(page_html)[:12000]
-
-        # If article text cannot be fetched/parsing fails, fallback to snippet/title to still run classification.
-        if not clean_text:
-            fallback_text = str(item.get("text") or title).strip()
-            clean_text = fallback_text[:12000]
+        clean_text = str(item.get("text", "")).strip()[:12000]
 
         if not clean_text:
             item.setdefault("classification", {})
