@@ -1,7 +1,49 @@
 import React, { useEffect, useState } from 'react';
 import { api, type CompanyCandidate, type TrackedCompany } from '../lib/api';
+import appLogo from '../assets/file.svg';
 
 const normalizeCompanyName = (value: string) => value.trim().toLowerCase();
+const AVATAR_STORAGE_KEY = 'dashboard_avatar_image';
+
+const decodeJwtPayload = (token: string): Record<string, unknown> | null => {
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    const parsed = JSON.parse(atob(padded));
+    if (!parsed || typeof parsed !== 'object') return null;
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+};
+
+const displayNameFromToken = (token: string | null): string => {
+  if (!token) return 'User';
+  const payload = decodeJwtPayload(token);
+  if (!payload) return 'User';
+
+  const fullName = payload.full_name;
+  if (typeof fullName === 'string' && fullName.trim()) {
+    return fullName.trim();
+  }
+
+  const username = payload.username;
+  if (typeof username === 'string' && username.trim()) {
+    return username.trim();
+  }
+
+  const email = payload.email;
+  if (typeof email === 'string' && email.trim()) {
+    const localPart = email.split('@')[0] || '';
+    if (localPart) {
+      return localPart.charAt(0).toUpperCase() + localPart.slice(1);
+    }
+  }
+
+  return 'User';
+};
 
 type TransferFx = {
   id: number;
@@ -13,7 +55,11 @@ type TransferFx = {
 };
 
 export const DashboardView: React.FC = () => {
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isOptionsOpen, setIsOptionsOpen] = useState(false);
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [userDisplayName, setUserDisplayName] = useState('User');
+  const [avatarImage, setAvatarImage] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [lastSearchTerm, setLastSearchTerm] = useState('');
   const [candidates, setCandidates] = useState<CompanyCandidate[]>([]);
@@ -25,8 +71,11 @@ export const DashboardView: React.FC = () => {
   const [recentlyTrackedNames, setRecentlyTrackedNames] = useState<Set<string>>(new Set());
   const [transferFx, setTransferFx] = useState<TransferFx | null>(null);
   const [trackedPulse, setTrackedPulse] = useState(false);
+  const [retryAttempts, setRetryAttempts] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const trackedSectionRef = React.useRef<HTMLElement | null>(null);
+  const userMenuRef = React.useRef<HTMLDivElement | null>(null);
+  const avatarInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const handleLogout = () => {
     api.logout();
@@ -49,6 +98,53 @@ export const DashboardView: React.FC = () => {
   useEffect(() => {
     loadTrackedCompanies();
   }, []);
+
+  useEffect(() => {
+    const displayName = displayNameFromToken(api.getToken());
+    setUserDisplayName(displayName);
+
+    const savedAvatar = localStorage.getItem(AVATAR_STORAGE_KEY);
+    if (savedAvatar) {
+      setAvatarImage(savedAvatar);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!userMenuRef.current) return;
+      if (!userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+        setIsOptionsOpen(false);
+        setIsEditProfileOpen(false);
+      }
+    };
+
+    window.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      window.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : null;
+      if (!result) return;
+      setAvatarImage(result);
+      localStorage.setItem(AVATAR_STORAGE_KEY, result);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleToggleUserMenu = () => {
+    setIsUserMenuOpen((prev) => !prev);
+    setIsOptionsOpen(false);
+    setIsEditProfileOpen(false);
+  };
 
   const triggerTrackedHighlight = (companyName: string) => {
     const normalized = normalizeCompanyName(companyName);
@@ -95,22 +191,40 @@ export const DashboardView: React.FC = () => {
     }, 1450);
   };
 
-  const handleSearchCompanies = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const name = search.trim();
-    if (!name) return;
-
+  const runCompanySearch = async (name: string): Promise<CompanyCandidate[] | null> => {
     setIsSearching(true);
     setError(null);
     setLastSearchTerm(name);
     try {
       const items = await api.searchCompanyCandidates(name);
       setCandidates(items);
+      return items;
     } catch {
       setError('Nu am putut căuta candidații pentru companie.');
+      return null;
     } finally {
       setIsSearching(false);
     }
+  };
+
+  const handleSearchCompanies = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = search.trim();
+    if (!name) return;
+    setRetryAttempts(0);
+    await runCompanySearch(name);
+  };
+
+  const handleRetrySearch = async () => {
+    const name = lastSearchTerm.trim();
+    if (!name || isSearching || retryAttempts >= 3) return;
+    const items = await runCompanySearch(name);
+    if (!items) return;
+    if (items.length === 0) {
+      setRetryAttempts((prev) => Math.min(prev + 1, 3));
+      return;
+    }
+    setRetryAttempts(0);
   };
 
   const handleTrackCompany = async (companyName: string, candidateKey: string, sourceButton: HTMLButtonElement | null) => {
@@ -179,9 +293,11 @@ export const DashboardView: React.FC = () => {
     (candidate) => !tracked.some((item) => normalizeCompanyName(item.company_name) === normalizeCompanyName(candidate.name)),
   );
   const allSearchMatchesTracked = candidates.length > 0 && availableCandidates.length === 0;
+  const retryLimitReached = retryAttempts >= 3;
+  const showRetrySearch = !isSearching && lastSearchTerm.trim().length > 0 && candidates.length === 0 && !retryLimitReached;
 
   return (
-    <div className="relative flex h-screen overflow-hidden bg-[#d7e5ff] font-sans">
+    <div className="relative flex h-screen overflow-hidden bg-transparent font-sans">
       <div className="pointer-events-none absolute inset-0">
         <div className="ocean-glow ocean-glow-left" />
         <div className="ocean-glow ocean-glow-right" />
@@ -190,27 +306,98 @@ export const DashboardView: React.FC = () => {
         <div className="midnight-veil midnight-veil-right" />
       </div>
 
-      <aside className="relative z-10 w-64 bg-[#002159] border-r border-[#0b3f93] flex flex-col p-6 shadow-2xl">
-        <h1 className="font-display text-[2rem] leading-none text-[#f8fbff] mb-10 tracking-tight">Insight</h1>
-        <nav className="flex-1 space-y-1">
-          <button className="interactive-btn w-full text-left p-3 rounded-lg bg-[#003DA5] text-white font-semibold transition">Dashboard</button>
-        </nav>
+      <aside className="sidebar-shell relative z-10 m-3 flex w-44 flex-col rounded-[42px] p-4">
+        <div className="sidebar-shell-overlay pointer-events-none absolute inset-0 rounded-[42px]" />
+        <div className="sidebar-accent sidebar-accent-blue pointer-events-none absolute" />
+        <div className="sidebar-accent sidebar-accent-amber pointer-events-none absolute" />
+        <div className="sidebar-accent-line pointer-events-none absolute" />
+        <div className="relative z-10 mb-8 -mx-2">
+          <img
+            src={appLogo}
+            alt="Insight"
+            className="h-auto w-[calc(100%+1rem)] max-w-none -translate-x-1"
+          />
+        </div>
+        <div className="flex-1" />
 
-        <div className="mt-auto rounded-xl border border-[#2f5dad] bg-[#0a2f73] p-4">
-          <p className="text-[11px] uppercase tracking-widest text-[#8fb4ff] font-bold">Session</p>
-          <p className="text-sm text-[#dce9ff] mt-1">You are currently authenticated.</p>
+        <div ref={userMenuRef} className="absolute bottom-7 left-1/2 z-20 -translate-x-1/2">
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleAvatarFileChange}
+          />
+
+          {isUserMenuOpen && (
+            <div className="absolute bottom-[4.7rem] left-1/2 z-50 w-48 -translate-x-1/2 rounded-2xl border border-[#b7ccff] bg-white p-4 shadow-xl">
+              {!isEditProfileOpen && (
+                <>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#4d6791]">Session</p>
+                  <p className="mt-2 text-sm text-[#1d3866]">You are currently authenticated.</p>
+                </>
+              )}
+
+              {!isOptionsOpen ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOptionsOpen(true);
+                    setIsEditProfileOpen(false);
+                  }}
+                  className="interactive-btn mt-4 w-full rounded-md border border-[#b7ccff] bg-[#edf3ff] px-3 py-2 text-sm font-semibold text-[#003DA5] hover:bg-[#dfeaff]"
+                >
+                  Options
+                </button>
+              ) : isEditProfileOpen ? (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => avatarInputRef.current?.click()}
+                    className="interactive-btn w-full rounded-md border border-[#b7ccff] bg-white px-3 py-2 text-sm font-semibold text-[#1d3866] hover:bg-[#f3f7ff]"
+                  >
+                    Edit Profile Photo
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-4 space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditProfileOpen(true)}
+                    className="interactive-btn w-full rounded-md border border-[#b7ccff] bg-[#edf3ff] px-3 py-2 text-sm font-semibold text-[#003DA5] hover:bg-[#dfeaff]"
+                  >
+                    Edit Profile
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="interactive-btn w-full rounded-md bg-[#F29800] px-3 py-2 text-sm font-semibold text-[#1f1300] hover:bg-[#d88900] transition"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           <button
-            onClick={() => setConfirmOpen(true)}
-            className="interactive-btn mt-3 w-full rounded-md bg-[#F29800] px-3 py-2 text-sm font-semibold text-[#1f1300] hover:bg-[#d88900] transition"
+            type="button"
+            onClick={handleToggleUserMenu}
+            className="interactive-btn relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-[#b7ccff] bg-[#eef2f7] shadow-[0_10px_25px_rgba(0,0,0,0.28)]"
           >
-            Sign Out
+            {avatarImage ? (
+              <img src={avatarImage} alt="User avatar" className="h-full w-full object-cover" />
+            ) : (
+              <span className="text-xl font-extrabold text-[#0059F2]">{userDisplayName.charAt(0).toUpperCase()}</span>
+            )}
           </button>
         </div>
       </aside>
 
       <main className="relative z-10 flex-1 p-12 overflow-auto">
         <header className="mb-8 animate-fade-in-up">
-          <h2 className="font-display text-4xl font-extrabold text-[#00163d] tracking-tight">Company Tracking Dashboard</h2>
+          <h2 className="font-display text-4xl font-extrabold text-[#00163d] tracking-tight">AI Supplier Intelligence Platform</h2>
           <p className="text-[#003DA5] mt-2 font-semibold">Find a company and add it to your tracked companies list.</p>
         </header>
 
@@ -221,7 +408,7 @@ export const DashboardView: React.FC = () => {
               placeholder="Ex: NVIDIA, Tesla, Microsoft"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 rounded-xl border border-[#bfd2ff] px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#0059F2] focus:border-[#0059F2]"
+              className="flex-1 rounded-xl border border-[#bfd2ff] bg-[#eef1f4] px-4 py-3 text-sm text-[#2c3d56] placeholder:text-[#5f718f] outline-none focus:ring-2 focus:ring-[#0059F2] focus:border-[#0059F2]"
             />
             <button
               type="submit"
@@ -245,7 +432,24 @@ export const DashboardView: React.FC = () => {
                 Great. All matches for <span className="font-bold">{lastSearchTerm}</span> are already in Tracked Companies.
               </div>
             ) : (
-              <p className="text-sm text-[#003DA5]">No results yet. Search for a company above.</p>
+              <div className="flex items-center justify-between gap-3 text-sm text-[#003DA5]">
+                <p className="min-w-0 flex-1">
+                  {lastSearchTerm.trim().length > 0
+                    ? retryLimitReached
+                      ? `Sorry, we couldn't find a company for "${lastSearchTerm}" after several attempts. Please try another name.`
+                      : `No companies found for "${lastSearchTerm}".`
+                    : 'No results yet. Search for a company above.'}
+                </p>
+                {showRetrySearch && (
+                  <button
+                    type="button"
+                    onClick={handleRetrySearch}
+                    className="retry-action-btn"
+                  >
+                    Retry
+                  </button>
+                )}
+              </div>
             )
           ) : (
             <div className="space-y-3">
@@ -311,7 +515,7 @@ export const DashboardView: React.FC = () => {
                   <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-[#4d6791]">#</th>
                   <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-[#4d6791]">Company</th>
                   <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-[#4d6791]">Tracked At</th>
-                  <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-[#4d6791]">Actions</th>
+                  <th className="py-2 text-right text-xs font-bold uppercase tracking-wider text-[#4d6791]">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -337,11 +541,11 @@ export const DashboardView: React.FC = () => {
                           {item.created_at ? new Date(item.created_at).toLocaleString() : '-'}
                         </td>
                         <td className="py-3 text-sm text-[#395581]">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-end gap-2">
                             <button
                               type="button"
                               onClick={() => handleOpenDetails(item.company_name)}
-                              className="interactive-btn rounded-md border border-[#b7ccff] px-3 py-1.5 text-xs font-semibold text-[#003DA5] hover:bg-[#edf3ff]"
+                              className="details-action-btn"
                             >
                               Details
                             </button>
@@ -349,7 +553,7 @@ export const DashboardView: React.FC = () => {
                               type="button"
                               onClick={() => handleDeleteTrackedCompany(item.company_name, trackedKey)}
                               disabled={isDeleting}
-                              className="interactive-btn rounded-md bg-[#A56800] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#8b5600] disabled:opacity-60"
+                              className="delete-action-btn"
                             >
                               {isDeleting ? 'Deleting...' : 'Delete'}
                             </button>
@@ -364,29 +568,6 @@ export const DashboardView: React.FC = () => {
           </div>
         </section>
       </main>
-
-      {confirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#00122f]/45 p-4">
-          <div className="w-full max-w-sm rounded-xl border border-[#d7e2ff] bg-white p-6 shadow-2xl animate-fade-in-up">
-            <h3 className="font-display text-lg font-bold text-[#00163d]">Sign out?</h3>
-            <p className="mt-2 text-sm text-[#395581]">You will be redirected to the login page.</p>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                onClick={() => setConfirmOpen(false)}
-                className="interactive-btn rounded-md border border-[#b7ccff] px-4 py-2 text-sm font-semibold text-[#003DA5] hover:bg-[#edf3ff]"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleLogout}
-                className="interactive-btn rounded-md bg-[#A56800] px-4 py-2 text-sm font-semibold text-white hover:bg-[#8b5600]"
-              >
-                Sign Out
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {transferFx && (
         <div

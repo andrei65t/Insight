@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { api, type CompanyDetails } from '../lib/api';
-import { MessageSquare, Send, Bot, User, Sparkles } from 'lucide-react';
+import { Send, Bot, User, Sparkles, X } from 'lucide-react';
 
 type Props = {
   companyName: string;
@@ -17,6 +17,7 @@ export const CompanyDashboardView: React.FC<Props> = ({ companyName }) => {
   const [error, setError] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Chat State
   const [question, setQuestion] = useState('');
@@ -90,7 +91,7 @@ export const CompanyDashboardView: React.FC<Props> = ({ companyName }) => {
         }
       } catch {
         if (!cancelled) {
-          setError('Nu am putut incarca detaliile companiei.');
+          setError('Could not load company details.');
         }
       } finally {
         if (!cancelled) {
@@ -120,7 +121,7 @@ export const CompanyDashboardView: React.FC<Props> = ({ companyName }) => {
       const result = await api.askAI(companyName, userMsg);
       setChatHistory(prev => [...prev, { role: 'assistant', content: result.answer }]);
     } catch (err) {
-      setChatHistory(prev => [...prev, { role: 'assistant', content: 'Eroare: Nu am putut obține un răspuns de la AI.' }]);
+      setChatHistory(prev => [...prev, { role: 'assistant', content: 'Error: I could not get a response from AI.' }]);
     } finally {
       setIsAsking(false);
     }
@@ -141,206 +142,107 @@ export const CompanyDashboardView: React.FC<Props> = ({ companyName }) => {
   const showLoadingState = isLoading || isRetrying;
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 md:p-10">
-      <div className="mx-auto max-w-7xl">
+    <div className="company-page min-h-screen p-6 md:p-10">
+      <div className="company-page-glow company-page-glow-blue" />
+      <div className="company-page-glow company-page-glow-amber" />
+
+      <div className={`company-content-shell ${isChatOpen ? 'company-content-shifted' : ''}`}>
         <button
           type="button"
           onClick={goBack}
-          className="mb-6 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition"
+          className="company-back-btn mb-6"
         >
           Back to Dashboard
         </button>
 
-        <header className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Company Dashboard</p>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900">{companyName}</h1>
+        <header className="company-panel mb-8 rounded-2xl p-6">
+          <p className="text-sm font-semibold uppercase tracking-wide text-[#4a6287]">Company Dashboard</p>
+          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-[#0d244d]">{companyName}</h1>
           {summary?.latest_date && (
-            <p className="mt-2 text-sm text-slate-500">Ultima stire: {new Date(summary.latest_date).toLocaleDateString()}</p>
+            <p className="mt-2 text-sm text-[#566d8f]">Latest news date: {new Date(summary.latest_date).toLocaleDateString()}</p>
           )}
         </header>
 
         <section className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Total News</p>
-            <p className="mt-2 text-3xl font-extrabold text-slate-900">{summary?.total_news ?? 0}</p>
+          <div className="company-metric company-metric-total rounded-xl p-5">
+            <p className="text-xs font-bold uppercase tracking-wider text-[#50688d]">Total News</p>
+            <p className="mt-2 text-3xl font-extrabold text-[#0f274f]">{summary?.total_news ?? 0}</p>
           </div>
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Factual</p>
-            <p className="mt-2 text-3xl font-extrabold text-emerald-900">{summary?.factual_count ?? 0}</p>
+          <div className="company-metric company-metric-factual rounded-xl p-5">
+            <p className="text-xs font-bold uppercase tracking-wider text-[#1a6b6f]">Factual</p>
+            <p className="mt-2 text-3xl font-extrabold text-[#0f4950]">{summary?.factual_count ?? 0}</p>
           </div>
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-wider text-amber-700">Opinion</p>
-            <p className="mt-2 text-3xl font-extrabold text-amber-900">{summary?.opinion_count ?? 0}</p>
+          <div className="company-metric company-metric-opinion rounded-xl p-5">
+            <p className="text-xs font-bold uppercase tracking-wider text-[#8a5608]">Opinion</p>
+            <p className="mt-2 text-3xl font-extrabold text-[#5f3803]">{summary?.opinion_count ?? 0}</p>
           </div>
-          <div className="rounded-xl border border-sky-200 bg-sky-50 p-5 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-wider text-sky-700">Inference</p>
-            <p className="mt-2 text-3xl font-extrabold text-sky-900">{summary?.inference_count ?? 0}</p>
+          <div className="company-metric company-metric-inference rounded-xl p-5">
+            <p className="text-xs font-bold uppercase tracking-wider text-[#1f5e91]">Inference</p>
+            <p className="mt-2 text-3xl font-extrabold text-[#123f68]">{summary?.inference_count ?? 0}</p>
           </div>
         </section>
 
-        {/* --- AI CHAT BOT SECTION --- */}
-        <section className="mb-8 rounded-2xl border border-blue-100 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden flex flex-col relative">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
-                <Sparkles className="text-white h-5 w-5" />
-              </div>
-              <div>
-                <h2 className="text-white font-bold text-lg leading-tight">TrustScope AI</h2>
-                <p className="text-blue-100 text-xs">Analizează știrile: {companyName}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-              </span>
-              <span className="text-xs text-white/90 font-medium">Online</span>
-            </div>
-          </div>
-          
-          {/* Chat Messages */}
-          <div className="p-6 bg-slate-50 flex-1 max-h-[500px] overflow-y-auto space-y-5 scroll-smooth">
-            {chatHistory.length === 0 && (
-              <div className="h-full flex flex-col items-center justify-center text-center px-4 py-8">
-                <div className="bg-blue-100 p-4 rounded-full mb-4">
-                  <Bot className="h-8 w-8 text-blue-600" />
-                </div>
-                <h3 className="text-slate-800 font-semibold mb-2">Sunt pregătit!</h3>
-                <p className="text-slate-500 text-sm max-w-[280px]">
-                  Întreabă-mă despre riscurile de integritate, rezumatul știrilor sau eventualele scandaluri mediatice.
-                </p>
-              </div>
-            )}
-            
-            {chatHistory.map((msg, idx) => (
-              <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                {msg.role === 'assistant' && (
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-                    <Bot className="h-5 w-5 text-white" />
-                  </div>
-                )}
-                
-                <div className={`max-w-[85%] rounded-2xl px-5 py-3 text-sm shadow-sm whitespace-pre-wrap leading-relaxed ${
-                  msg.role === 'user' 
-                    ? 'bg-blue-600 text-white rounded-tr-none' 
-                    : 'bg-white text-slate-800 border border-slate-200/60 rounded-tl-none font-medium'
-                }`}>
-                  {msg.content}
-                </div>
-
-                {msg.role === 'user' && (
-                  <div className="w-9 h-9 rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center flex-shrink-0">
-                    <User className="h-5 w-5 text-slate-600" />
-                  </div>
-                )}
-              </div>
-            ))}
-            
-            {isAsking && (
-              <div className="flex gap-3">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
-                  <Bot className="h-5 w-5 text-white" />
-                </div>
-                <div className="bg-white rounded-2xl rounded-tl-none px-5 py-4 border border-slate-200/60 flex items-center gap-1.5 shadow-sm">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
-                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
-                </div>
-              </div>
-            )}
-            
-            <div ref={chatEndRef} />
-          </div>
-
-          {/* Input Area */}
-          <form onSubmit={handleAskAI} className="p-4 bg-white border-t border-slate-200 flex gap-3 items-end">
-            <textarea 
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleAskAI(e);
-                }
-              }}
-              placeholder={`Întreabă ceva despre ${companyName}...`}
-              className="flex-1 max-h-32 min-h-[44px] px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition text-sm resize-none"
-              disabled={isAsking}
-              rows={1}
-            />
-            <button 
-              type="submit"
-              disabled={isAsking || !question.trim()}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-3 rounded-xl hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition disabled:opacity-50 disabled:hover:shadow-none flex-shrink-0 h-[44px] w-[44px] flex items-center justify-center"
-            >
-              <Send className="h-4 w-4" />
-            </button>
-          </form>
-        </section>
-
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="company-panel rounded-2xl p-6">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-slate-900">News from Database</h2>
+            <h2 className="text-lg font-bold text-[#0f274f]">News from Database</h2>
             {showLoadingState && (
-              <span className="text-sm text-slate-500">{isRetrying ? 'Actualizam datele...' : 'Loading...'}</span>
+              <span className="text-sm text-[#567094]">{isRetrying ? 'Refreshing data...' : 'Loading...'}</span>
             )}
           </div>
 
           {showLoadingState ? (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              Colectam datele companiei. Daca dureaza prea mult, poti reincarca manual.
+            <div className="rounded-lg border border-[#c8d7ea] bg-[rgba(232,240,250,0.75)] p-4 text-sm text-[#426086]">
+              Fetching company data. If this takes too long, you can reload manually.
             </div>
           ) : error ? (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <div className="rounded-lg border border-[#f0c7a3] bg-[rgba(255,241,226,0.82)] p-4 text-sm text-[#8d4f0b]">
               <p>{error}</p>
               <button
                 type="button"
                 onClick={reloadDetails}
-                className="mt-3 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+                className="company-plain-btn mt-3"
               >
-                Reincarca
+                Reload
               </button>
             </div>
           ) : news.length === 0 ? (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              <p>Nu exista inca stiri in baza de date pentru aceasta companie.</p>
+            <div className="rounded-lg border border-[#c8d7ea] bg-[rgba(232,240,250,0.75)] p-4 text-sm text-[#426086]">
+              <p>There are no news records in the database for this company yet.</p>
               <button
                 type="button"
                 onClick={reloadDetails}
-                className="mt-3 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                className="company-plain-btn mt-3"
               >
-                Reincarca
+                Reload
               </button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full border-collapse">
+            <div className="company-table-wrap overflow-x-auto">
+              <table className="company-table min-w-full border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-200">
-                    <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Title</th>
-                    <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Source</th>
-                    <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Date</th>
-                    <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Fact Label</th>
-                    <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Link</th>
+                  <tr>
+                    <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-[#4e688d]">Title</th>
+                    <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-[#4e688d]">Source</th>
+                    <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-[#4e688d]">Date</th>
+                    <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-[#4e688d]">Fact Label</th>
+                    <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-[#4e688d]">Link</th>
                   </tr>
                 </thead>
                 <tbody>
                   {news.map((item) => (
-                    <tr key={item.id} className="border-b border-slate-100">
-                      <td className="py-3 text-sm text-slate-900">{item.title}</td>
-                      <td className="py-3 text-sm text-slate-700">{item.source}</td>
-                      <td className="py-3 text-sm text-slate-700">
+                    <tr key={item.id}>
+                      <td className="py-3 text-sm text-[#182f54]">{item.title}</td>
+                      <td className="py-3 text-sm text-[#425f84]">{item.source}</td>
+                      <td className="py-3 text-sm text-[#425f84]">
                         {item.date ? new Date(item.date).toLocaleDateString() : '-'}
                       </td>
-                      <td className="py-3 text-sm font-semibold text-slate-800">{item.fact_label}</td>
+                      <td className="py-3 text-sm font-semibold text-[#233f65]">{item.fact_label}</td>
                       <td className="py-3 text-sm">
                         <a
                           href={item.link}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-blue-600 hover:text-blue-500"
+                          className="company-open-link"
                         >
                           Open
                         </a>
@@ -353,6 +255,124 @@ export const CompanyDashboardView: React.FC<Props> = ({ companyName }) => {
           )}
         </section>
       </div>
+
+      {!isChatOpen && (
+        <button
+          type="button"
+          onClick={() => setIsChatOpen(true)}
+          className="ai-fab"
+          aria-label="Open AI chat"
+        >
+          <span className="ai-fab-aura" />
+          <Bot className="h-8 w-8 text-white" />
+        </button>
+      )}
+
+      {isChatOpen && (
+        <button
+          type="button"
+          onClick={() => setIsChatOpen(false)}
+          className="ai-edge-close"
+          aria-label="Close AI chat"
+        >
+          &gt;
+        </button>
+      )}
+
+      <aside className={`ai-drawer ${isChatOpen ? 'ai-drawer-open' : ''}`}>
+        <div className="ai-drawer-header">
+          <div className="flex items-center gap-3">
+            <div className="ai-drawer-icon-wrap">
+              <Sparkles className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white leading-tight">Insight AI</h2>
+              <p className="text-xs text-blue-100">Analyze news for {companyName}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsChatOpen(false)}
+            className="ai-drawer-close"
+            aria-label="Close chat"
+          >
+            <X className="h-4 w-4 text-white" />
+          </button>
+        </div>
+
+        <div className="ai-drawer-messages">
+          {chatHistory.length === 0 && (
+            <div className="ai-empty-state">
+              <div className="ai-empty-icon">
+                <Bot className="h-7 w-7 text-[#0059f2]" />
+              </div>
+              <h3 className="text-[#14345e] font-semibold mb-2">Ready to help</h3>
+              <p className="text-[#557097] text-sm max-w-[280px]">
+                Ask me about integrity risks, coverage trends, or potential reputation issues.
+              </p>
+            </div>
+          )}
+
+          {chatHistory.map((msg, idx) => (
+            <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+              {msg.role === 'assistant' && (
+                <div className="ai-avatar ai-avatar-assistant">
+                  <Bot className="h-4 w-4 text-white" />
+                </div>
+              )}
+
+              <div className={`ai-bubble ${msg.role === 'user' ? 'ai-bubble-user' : 'ai-bubble-assistant'}`}>
+                {msg.content}
+              </div>
+
+              {msg.role === 'user' && (
+                <div className="ai-avatar ai-avatar-user">
+                  <User className="h-4 w-4 text-[#4e688d]" />
+                </div>
+              )}
+            </div>
+          ))}
+
+          {isAsking && (
+            <div className="flex gap-3">
+              <div className="ai-avatar ai-avatar-assistant">
+                <Bot className="h-4 w-4 text-white" />
+              </div>
+              <div className="ai-thinking">
+                <span />
+                <span />
+                <span />
+              </div>
+            </div>
+          )}
+
+          <div ref={chatEndRef} />
+        </div>
+
+        <form onSubmit={handleAskAI} className="ai-drawer-input">
+          <textarea
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleAskAI(e);
+              }
+            }}
+            placeholder={`Ask something about ${companyName}...`}
+            className="ai-input"
+            disabled={isAsking}
+            rows={1}
+          />
+          <button
+            type="submit"
+            disabled={isAsking || !question.trim()}
+            className="ai-send-btn"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </form>
+      </aside>
     </div>
   );
 };
