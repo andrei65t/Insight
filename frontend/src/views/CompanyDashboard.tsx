@@ -11,6 +11,11 @@ type ChatMessage = {
   content: string;
 };
 
+type RiskTrend = {
+  deltaRiskPercentage: number;
+  direction: 'up' | 'down' | 'stable';
+} | null;
+
 export const CompanyDashboardView: React.FC<Props> = ({ companyName }) => {
   const [data, setData] = useState<CompanyDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -18,6 +23,8 @@ export const CompanyDashboardView: React.FC<Props> = ({ companyName }) => {
   const [isRetrying, setIsRetrying] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [riskTrend, setRiskTrend] = useState<RiskTrend>(null);
+  const [isEvidenceOpen, setIsEvidenceOpen] = useState(false);
 
   // Chat State
   const [question, setQuestion] = useState('');
@@ -138,6 +145,75 @@ export const CompanyDashboardView: React.FC<Props> = ({ companyName }) => {
 
   const summary = data?.summary;
   const news = data?.news ?? [];
+  const riskOverview = data?.risk_overview;
+
+  useEffect(() => {
+    if (!riskOverview) {
+      setRiskTrend(null);
+      return;
+    }
+
+    const storageKey = `company_risk_snapshot_${companyName.trim().toLowerCase()}`;
+    const raw = localStorage.getItem(storageKey);
+
+    if (raw) {
+      try {
+        const prev = JSON.parse(raw) as { risk_percentage?: number };
+        if (typeof prev.risk_percentage === 'number') {
+          const delta = riskOverview.risk_percentage - prev.risk_percentage;
+          const rounded = Math.round(delta);
+          const direction: 'up' | 'down' | 'stable' = rounded > 0 ? 'up' : rounded < 0 ? 'down' : 'stable';
+          setRiskTrend({
+            deltaRiskPercentage: rounded,
+            direction,
+          });
+        } else {
+          setRiskTrend(null);
+        }
+      } catch {
+        setRiskTrend(null);
+      }
+    } else {
+      setRiskTrend(null);
+    }
+
+    localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        risk_percentage: riskOverview.risk_percentage,
+        saved_at: new Date().toISOString(),
+      })
+    );
+  }, [companyName, riskOverview]);
+
+  const safetyTheme = (() => {
+    if (!riskOverview) {
+      return {
+        ring: 'border-[#c8d7ea]',
+        pill: 'bg-[#edf2f8] text-[#3c5578]',
+        score: 'text-[#24466f]',
+      };
+    }
+    if (riskOverview.color === 'green') {
+      return {
+        ring: 'border-[#8ed1ad]',
+        pill: 'bg-[#e7f7ee] text-[#0f6a43]',
+        score: 'text-[#0d6940]',
+      };
+    }
+    if (riskOverview.color === 'red') {
+      return {
+        ring: 'border-[#f2a8a8]',
+        pill: 'bg-[#ffeaea] text-[#9e2f2f]',
+        score: 'text-[#9e2f2f]',
+      };
+    }
+    return {
+      ring: 'border-[#f1ce8d]',
+      pill: 'bg-[#fff4de] text-[#8a5b06]',
+      score: 'text-[#8a5b06]',
+    };
+  })();
 
   const showLoadingState = isLoading || isRetrying;
 
@@ -217,40 +293,165 @@ export const CompanyDashboardView: React.FC<Props> = ({ companyName }) => {
               </button>
             </div>
           ) : (
-            <div className="company-table-wrap overflow-x-auto">
-              <table className="company-table min-w-full border-collapse">
-                <thead>
-                  <tr>
-                    <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-[#4e688d]">Title</th>
-                    <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-[#4e688d]">Source</th>
-                    <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-[#4e688d]">Date</th>
-                    <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-[#4e688d]">Fact Label</th>
-                    <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-[#4e688d]">Link</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {news.map((item) => (
-                    <tr key={item.id}>
-                      <td className="py-3 text-sm text-[#182f54]">{item.title}</td>
-                      <td className="py-3 text-sm text-[#425f84]">{item.source}</td>
-                      <td className="py-3 text-sm text-[#425f84]">
-                        {item.date ? new Date(item.date).toLocaleDateString() : '-'}
-                      </td>
-                      <td className="py-3 text-sm font-semibold text-[#233f65]">{item.fact_label}</td>
-                      <td className="py-3 text-sm">
-                        <a
-                          href={item.link}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="company-open-link"
-                        >
-                          Open
-                        </a>
-                      </td>
+            <div>
+              <div className="company-table-wrap overflow-x-auto">
+                <table className="company-table min-w-full border-collapse">
+                  <thead>
+                    <tr>
+                      <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-[#4e688d]">Title</th>
+                      <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-[#4e688d]">Source</th>
+                      <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-[#4e688d]">Date</th>
+                      <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-[#4e688d]">Fact Label</th>
+                      <th className="py-2 text-left text-xs font-bold uppercase tracking-wider text-[#4e688d]">Link</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {news.map((item) => (
+                      <tr key={item.id}>
+                        <td className="py-3 text-sm text-[#182f54]">{item.title}</td>
+                        <td className="py-3 text-sm text-[#425f84]">{item.source}</td>
+                        <td className="py-3 text-sm text-[#425f84]">
+                          {item.date ? new Date(item.date).toLocaleDateString() : '-'}
+                        </td>
+                        <td className="py-3 text-sm font-semibold text-[#233f65]">{item.fact_label}</td>
+                        <td className="py-3 text-sm">
+                          <a
+                            href={item.link}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="company-open-link"
+                          >
+                            Open
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {riskOverview && (
+                <section className={`mt-6 rounded-2xl border ${safetyTheme.ring} bg-[rgba(245,250,255,0.7)] p-5`}>
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.11em] text-[#5c7498]">Overall Supplier Safety</p>
+                      <div className="mt-2 flex items-end gap-3">
+                        <span className={`text-4xl font-extrabold leading-none ${safetyTheme.score}`}>
+                          {riskOverview.safe_percentage}%
+                        </span>
+                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${safetyTheme.pill}`}>
+                          {riskOverview.status_label}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm text-[#4f678b]">
+                        Confidence: <span className="font-semibold">{riskOverview.confidence}%</span> | Based on {summary?.total_news ?? 0} analyzed items
+                      </p>
+                      <p className="mt-1 text-xs text-[#5a7397]">
+                        Thresholds: Safe {'>='} {riskOverview.thresholds?.safe ?? 75}% | Watchlist {'>='} {riskOverview.thresholds?.watchlist ?? 50}%
+                      </p>
+                      {riskTrend && (
+                        <p className={`mt-1 text-xs ${riskTrend.direction === 'up' ? 'text-[#9e2f2f]' : riskTrend.direction === 'down' ? 'text-[#0f6a43]' : 'text-[#557097]'}`}>
+                          Trend vs last check:{' '}
+                          {riskTrend.direction === 'up'
+                            ? `+${Math.abs(riskTrend.deltaRiskPercentage)}% risk (worse)`
+                            : riskTrend.direction === 'down'
+                              ? `-${Math.abs(riskTrend.deltaRiskPercentage)}% risk (better)`
+                              : 'No change'}
+                        </p>
+                      )}
+                      {riskOverview.risk_signal && (
+                        <p className="mt-1 text-xs text-[#5a7397]">
+                          Risk signal: {riskOverview.risk_signal.risk_relevant ? 'Relevant' : 'Not relevant'} | Category: {riskOverview.risk_signal.category} | Severity: {riskOverview.risk_signal.severity}
+                        </p>
+                      )}
+                    </div>
+                    <div className="min-w-[220px] rounded-xl border border-[#c8d7ea] bg-[rgba(234,242,252,0.8)] px-4 py-3 text-sm text-[#35567f]">
+                      <p className="font-semibold text-[#254971]">Recommended action</p>
+                      <p className="mt-1">{riskOverview.report?.buyer_summary || riskOverview.advice}</p>
+                      {!!riskOverview.evidence?.length && (
+                        <button
+                          type="button"
+                          onClick={() => setIsEvidenceOpen((prev) => !prev)}
+                          className="company-plain-btn mt-3"
+                        >
+                          {isEvidenceOpen ? 'Hide evidence' : 'Show evidence'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <div className="rounded-xl border border-[#c8d7ea] bg-[rgba(234,242,252,0.75)] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[#587196]">Why this score</p>
+                      <p className="mt-2 text-sm text-[#35567f]">{riskOverview.report?.overall_assessment || riskOverview.why_it_matters}</p>
+                      {riskOverview.report?.risk_statement && (
+                        <p className="mt-2 text-sm text-[#35567f]">
+                          <span className="font-semibold text-[#274c78]">Risk statement:</span> {riskOverview.report.risk_statement}
+                        </p>
+                      )}
+                      {riskOverview.report?.political_or_macro_note && (
+                        <p className="mt-2 text-sm text-[#35567f]">
+                          <span className="font-semibold text-[#274c78]">Political/macro:</span> {riskOverview.report.political_or_macro_note}
+                        </p>
+                      )}
+                      <p className="mt-2 text-sm text-[#35567f]">
+                        <span className="font-semibold text-[#274c78]">Why it matters:</span> {riskOverview.why_it_matters}
+                      </p>
+                      <ul className="mt-3 space-y-1 text-sm text-[#2f4d73]">
+                        {riskOverview.key_drivers.map((driver, index) => (
+                          <li key={`${driver}-${index}`}>• {driver}</li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="rounded-xl border border-[#c8d7ea] bg-[rgba(234,242,252,0.75)] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[#587196]">Source quality mix</p>
+                      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                        <div className="rounded-lg bg-[#e8f6ed] px-2 py-2">
+                          <p className="text-lg font-bold text-[#0f6a43]">{riskOverview.source_mix.high_quality}</p>
+                          <p className="text-[11px] text-[#3a5d4c]">High</p>
+                        </div>
+                        <div className="rounded-lg bg-[#fff5de] px-2 py-2">
+                          <p className="text-lg font-bold text-[#8a5b06]">{riskOverview.source_mix.medium_quality}</p>
+                          <p className="text-[11px] text-[#6f5933]">Medium</p>
+                        </div>
+                        <div className="rounded-lg bg-[#ffeaea] px-2 py-2">
+                          <p className="text-lg font-bold text-[#9e2f2f]">{riskOverview.source_mix.low_quality}</p>
+                          <p className="text-[11px] text-[#7a4b4b]">Low</p>
+                        </div>
+                      </div>
+                      <p className="mt-3 text-xs text-[#587196]">Risk estimate: {riskOverview.risk_percentage}%</p>
+                    </div>
+                  </div>
+
+                  {isEvidenceOpen && !!riskOverview.evidence?.length && (
+                    <div className="mt-4 rounded-xl border border-[#c8d7ea] bg-[rgba(234,242,252,0.75)] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[#587196]">Top evidence behind score</p>
+                      <div className="mt-3 space-y-3">
+                        {riskOverview.evidence.map((item, index) => (
+                          <div key={`${item.title}-${index}`} className="rounded-lg border border-[#d4e0ef] bg-[rgba(248,252,255,0.86)] p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-sm font-semibold text-[#1f3f68]">{item.title}</p>
+                              <span className="rounded-full bg-[#e7eef8] px-2 py-0.5 text-xs font-semibold text-[#3f5f86]">
+                                Score {item.evidence_score}%
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-[#5d7598]">
+                              {item.source} | {item.date ? new Date(item.date).toLocaleDateString() : '-'} | {item.fact_label}
+                            </p>
+                            <p className="mt-1 text-sm text-[#3a5880]">{item.rationale}</p>
+                            {item.link && (
+                              <a href={item.link} target="_blank" rel="noreferrer" className="company-open-link mt-2 inline-block text-sm">
+                                Open source
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </section>
+              )}
             </div>
           )}
         </section>

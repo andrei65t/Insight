@@ -226,3 +226,52 @@ def add_news_companies(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
     data = response.json()
     return data if isinstance(data, list) else []
+
+
+def upsert_company_profile(profile: Dict[str, Any]) -> Dict[str, Any]:
+    company_name = str(profile.get("company_name", "")).strip()
+    if not company_name:
+        raise RuntimeError("company_name is required for companies upsert")
+
+    url = f"{settings.SUPABASE_URL}/rest/v1/companies"
+    headers = _supabase_service_headers(prefer="resolution=merge-duplicates,return=representation")
+
+    response = requests.post(
+        url,
+        headers=headers,
+        params={"on_conflict": "company_name"},
+        json=[profile],
+        timeout=30,
+    )
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"Failed to upsert companies row: {response.text}")
+
+    data = response.json()
+    return data[0] if isinstance(data, list) and data else {}
+
+
+def get_company_profile(company_name: str) -> Dict[str, Any] | None:
+    name = str(company_name or "").strip()
+    if not name:
+        return None
+
+    url = f"{settings.SUPABASE_URL}/rest/v1/companies"
+    response = requests.get(
+        url,
+        headers=_supabase_service_headers(),
+        params={
+            "select": "id,company_name,financials,reputation,risk_level,risk_percentage,created_at,updated_at",
+            "company_name": f"eq.{name}",
+            "limit": "1",
+        },
+        timeout=30,
+    )
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"Failed to fetch company profile: {response.text}")
+
+    data = response.json()
+    if isinstance(data, list) and data:
+        return data[0]
+    return None

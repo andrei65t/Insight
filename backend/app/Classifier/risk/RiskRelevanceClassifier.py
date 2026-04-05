@@ -1,7 +1,10 @@
 import json
 import sys
 
-from GeminiService import GeminiService
+try:
+    from app.HaikuService import HaikuService
+except ModuleNotFoundError:
+    from HaikuService import HaikuService
 
 
 class RiskRelevanceClassifier:
@@ -29,7 +32,7 @@ Confidence must be an integer between 0 and 100.
 """
 
     def __init__(self):
-        self.ai_service = GeminiService()
+        self.ai_service = HaikuService()
 
     def build_prompt(
         self,

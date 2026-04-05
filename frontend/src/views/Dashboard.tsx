@@ -227,6 +227,13 @@ export const DashboardView: React.FC = () => {
     setRetryAttempts(0);
   };
 
+  const handleSearchAgain = async () => {
+    const name = search.trim() || lastSearchTerm.trim();
+    if (!name || isSearching) return;
+    setRetryAttempts(0);
+    await runCompanySearch(name);
+  };
+
   const handleTrackCompany = async (companyName: string, candidateKey: string, sourceButton: HTMLButtonElement | null) => {
     const name = companyName.trim();
     if (!name) return;
@@ -295,6 +302,7 @@ export const DashboardView: React.FC = () => {
   const allSearchMatchesTracked = candidates.length > 0 && availableCandidates.length === 0;
   const retryLimitReached = retryAttempts >= 3;
   const showRetrySearch = !isSearching && lastSearchTerm.trim().length > 0 && candidates.length === 0 && !retryLimitReached;
+  const showSearchAgainButton = !isSearching && candidates.length > 0;
 
   return (
     <div className="relative flex h-screen overflow-hidden bg-transparent font-sans">
@@ -423,7 +431,18 @@ export const DashboardView: React.FC = () => {
         <section className="glass-panel animate-fade-in-up rounded-2xl p-6 shadow-sm mb-8" style={{ animationDelay: '160ms' }}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-display text-lg font-bold text-[#00163d]">Search Results</h3>
-            {isSearching && <span className="text-sm text-[#0059F2] font-semibold">Searching...</span>}
+            <div className="flex items-center gap-2">
+              {isSearching && <span className="text-sm text-[#0059F2] font-semibold">Searching...</span>}
+              {showSearchAgainButton && (
+                <button
+                  type="button"
+                  onClick={handleSearchAgain}
+                  className="retry-action-btn"
+                >
+                  Search again
+                </button>
+              )}
+            </div>
           </div>
 
           {availableCandidates.length === 0 && !isSearching ? (

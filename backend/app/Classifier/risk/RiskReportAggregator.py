@@ -1,7 +1,10 @@
 import json
 import sys
 
-from GeminiService import GeminiService
+try:
+    from app.HaikuService import HaikuService
+except ModuleNotFoundError:
+    from HaikuService import HaikuService
 
 
 class RiskReportAggregator:
@@ -30,7 +33,7 @@ JSON schema:
 """
 
     def __init__(self):
-        self.ai_service = GeminiService()
+        self.ai_service = HaikuService()
 
     def build_prompt(
         self,

@@ -44,6 +44,48 @@ type CompanyDetails = {
     inference_count: number;
     latest_date?: string | null;
   };
+  risk_overview?: {
+    company: string;
+    safe_percentage: number;
+    risk_percentage: number;
+    confidence: number;
+    status: 'safe' | 'watchlist' | 'high_risk' | 'insufficient_data';
+    status_label: string;
+    color: 'green' | 'yellow' | 'red';
+    key_drivers: string[];
+    source_mix: {
+      high_quality: number;
+      medium_quality: number;
+      low_quality: number;
+    };
+    why_it_matters: string;
+    advice: string;
+    report?: {
+      overall_assessment: string;
+      risk_statement: string;
+      political_or_macro_note: string;
+      buyer_summary: string;
+    };
+    evidence?: Array<{
+      title: string;
+      source: string;
+      date?: string;
+      link: string;
+      fact_label: string;
+      evidence_score: number;
+      rationale: string;
+    }>;
+    risk_signal?: {
+      risk_relevant: boolean;
+      category: string;
+      severity: string;
+      confidence: number;
+    };
+    thresholds?: {
+      safe: number;
+      watchlist: number;
+    };
+  };
 };
 
 function authHeaders(): HeadersInit {
