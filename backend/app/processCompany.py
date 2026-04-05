@@ -13,6 +13,9 @@ import html
 import re
 import requests
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 HF_SUMMARY_API_URL = "https://router.huggingface.co/hf-inference/models/facebook/bart-large-cnn"
