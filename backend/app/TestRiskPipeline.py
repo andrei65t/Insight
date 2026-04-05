@@ -1,9 +1,9 @@
 import json
 
-from Classifier.RiskRelevanceClassifier import RiskRelevanceClassifier
-from Classifier.RiskRadarClassifier import RiskRadarClassifier
-from Classifier.PoliticalImpactClassifier import PoliticalImpactClassifier
-from Classifier.RiskReportAggregator import RiskReportAggregator
+from app.Classifier.RiskRelevanceClassifier import RiskRelevanceClassifier
+from app.Classifier.RiskRadarClassifier import RiskRadarClassifier
+from app.Classifier.PoliticalImpactClassifier import PoliticalImpactClassifier
+from app.Classifier.RiskReportAggregator import RiskReportAggregator
 
 
 TEST_CASES = [

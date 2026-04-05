@@ -66,16 +66,10 @@ async function getErrorMessage(response: Response, fallback: string): Promise<st
     if (typeof data?.message === 'string' && data.message.trim()) {
       return data.message;
     }
-    if (typeof data?.error_description === 'string' && data.error_description.trim()) {
-      return data.error_description;
-    }
-    if (typeof data?.error === 'string' && data.error.trim()) {
-      return data.error;
-    }
+    return fallback;
   } catch {
-    // Ignore parse errors and return fallback.
+    return fallback;
   }
-  return fallback;
 }
 
 export const api = {
@@ -103,9 +97,7 @@ export const api = {
   async register(payload: RegisterPayload): Promise<LoginResponse & { user?: unknown }> {
     const response = await fetch(`${BASE_URL}/login/register`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
 
@@ -181,27 +173,41 @@ export const api = {
 
   async getCompanyDetails(companyName: string): Promise<CompanyDetails> {
     const encodedName = encodeURIComponent(companyName);
+    // Crescem timeout-ul la 30 de secunde pentru AI
     const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+    const id = setTimeout(() => controller.abort(), 30000);
 
-    let response: Response;
     try {
-      response = await fetch(`${BASE_URL}/tracking/companies/${encodedName}/details`, {
+      const response = await fetch(`${BASE_URL}/tracking/companies/${encodedName}/details`, {
         method: 'GET',
         headers: authHeaders(),
         signal: controller.signal,
       });
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new Error('Request timeout while loading company details');
+      clearTimeout(id);
+
+      if (!response.ok) {
+        throw new Error(await getErrorMessage(response, 'Failed to load company details'));
       }
-      throw error;
-    } finally {
-      window.clearTimeout(timeoutId);
+
+      return await response.json();
+    } catch (e: any) {
+      clearTimeout(id);
+      if (e.name === 'AbortError') {
+        throw new Error('Timeout: Serverul a răspuns prea greu.');
+      }
+      throw e;
     }
+  },
+
+  async askAI(companyName: string, question: string): Promise<{ answer: string }> {
+    const response = await fetch(`${BASE_URL}/tracking/chat`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ company_name: companyName, question }),
+    });
 
     if (!response.ok) {
-      throw new Error(await getErrorMessage(response, 'Failed to load company details'));
+      throw new Error(await getErrorMessage(response, 'Failed to get answer from AI'));
     }
 
     return await response.json();
@@ -216,5 +222,4 @@ export const api = {
   },
 };
 
-export type { CompanyCandidate, TrackedCompany };
-export type { CompanyDetails, CompanyNewsItem };
+export type { CompanyCandidate, TrackedCompany, CompanyDetails, CompanyNewsItem };

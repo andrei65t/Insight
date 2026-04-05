@@ -1,4 +1,5 @@
 import logging
+import json
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, status
@@ -7,6 +8,7 @@ from pydantic import BaseModel, Field
 from app.processCompany import process_company
 
 from app.NameSearcher import NameSearcher
+from app.GeminiService import GeminiService
 from app.supabase_auth import (
     add_tracked_company,
     delete_tracked_company,
@@ -37,6 +39,11 @@ class TrackCompanyRequest(BaseModel):
 
 class CompanySearchRequest(BaseModel):
     query: str = Field(min_length=1, max_length=200)
+
+
+class ChatRequest(BaseModel):
+    company_name: str
+    question: str
 
 
 def _normalize_contenders(payload: dict) -> list[dict[str, str]]:
@@ -222,3 +229,70 @@ def get_company_details(company_name: str, authorization: str | None = Header(de
         if "Invalid or expired access token" in message:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=message) from exc
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post("/tracking/chat")
+def chat_with_ai(payload: ChatRequest, authorization: str | None = Header(default=None)) -> Any:
+    token = _extract_bearer_token(authorization)
+    
+    try:
+        # 1. Validate user
+        get_user_from_access_token(token)
+        
+        # 2. Fetch context (news for this company)
+        news = list_company_news(payload.company_name, limit=10)
+        
+        if not news:
+            return {"answer": f"Nu am găsit știri colectate pentru {payload.company_name} în baza de date. AI-ul nu poate răspunde fără context."}
+
+        # Extragem textul complet pentru primele 5 articole pentru a furniza detalii AI-ului
+        from app.processCompany import _fetch_link_html, _html_to_clean_text
+        import concurrent.futures
+
+        def _fetch_content(n):
+            html = _fetch_link_html(n.get("link", ""))
+            clean = _html_to_clean_text(html)
+            n["article_content"] = clean[:3000] if clean else "Nu s-a putut extrage textul complet."
+            return n
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            top_news = list(executor.map(_fetch_content, news[:5]))
+
+        # Celelalte (peste 5) le lăsăm doar ca titluri pentru a nu da timeout
+        rest_news = news[5:]
+
+        # 3. Build context string
+        context_str_parts = []
+        for n in top_news:
+            context_str_parts.append(
+                f"- Titlu: {n['title']}\n  Sursă: {n['source']} | Tip: {n['fact_label']}\n  Conținut extras: {n['article_content']}\n"
+            )
+        for n in rest_news:
+            context_str_parts.append(
+                f"- Titlu: {n['title']} | Sursă: {n['source']} | Tip: {n['fact_label']} (fără conținut detaliat)"
+            )
+        context_str = "\n".join(context_str_parts)
+
+        # 4. Initialize Gemini
+        service = GeminiService()
+        
+        system_instr = f"""
+        Ești un asistent AI specializat în analiza furnizorilor. 
+        Răspunde la întrebarea utilizatorului folosind DOAR contextul oferit mai jos despre compania {payload.company_name}.
+        Dacă nu găsești răspunsul în context, spune clar acest lucru.
+        Fii concis și profesional.
+        Răspunde în limba română.
+        
+        CONTEXT (Știri colectate):
+        {context_str}
+        
+        Returnează răspunsul sub formă de JSON: {{"answer": "textul răspunsului tău"}}
+        """
+        
+        response_json = service.send_prompt(user_input=payload.question, system_instruction=system_instr)
+        
+        return json.loads(response_json)
+
+    except Exception as exc:
+        logger.error("POST /tracking/chat failed: %s", str(exc))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
