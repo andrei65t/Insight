@@ -3,7 +3,7 @@ version: '3.8'
 services:
   backend:
     build: ./backend
-    container_name: trustscope-backend
+    container_name: insight-backend
     restart: on-failure
     ports:
       - "8000:8000"
@@ -16,7 +16,7 @@ services:
 
   frontend:
     build: ./frontend
-    container_name: trustscope-frontend
+    container_name: insight-frontend
     ports:
       - "5173:5173"
     volumes:

@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
-    PROJECT_NAME: str = "TrustScope B2B"
+    PROJECT_NAME: str = "Insight B2B"
 
     # Supabase config
     SUPABASE_URL: str = "https://nxkjiukvmeqwwdwktucl.supabase.co"
