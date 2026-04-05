@@ -1,5 +1,4 @@
 import logging
-import json
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, status
@@ -8,7 +7,6 @@ from pydantic import BaseModel, Field
 from app.processCompany import process_company
 
 from app.NameSearcher import NameSearcher
-from app.GeminiService import GeminiService
 from app.supabase_auth import (
     add_tracked_company,
     delete_tracked_company,
@@ -39,11 +37,6 @@ class TrackCompanyRequest(BaseModel):
 
 class CompanySearchRequest(BaseModel):
     query: str = Field(min_length=1, max_length=200)
-
-
-class ChatRequest(BaseModel):
-    company_name: str
-    question: str
 
 
 def _normalize_contenders(payload: dict) -> list[dict[str, str]]:
@@ -229,7 +222,6 @@ def get_company_details(company_name: str, authorization: str | None = Header(de
         if "Invalid or expired access token" in message:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=message) from exc
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-
 
 @router.post("/tracking/chat")
 def chat_with_ai(payload: ChatRequest, authorization: str | None = Header(default=None)) -> Any:
