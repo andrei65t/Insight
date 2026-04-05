@@ -5,6 +5,8 @@ from fastapi import APIRouter, Header, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.processCompany import process_company
+from app.GeminiService import GeminiService
+import json
 
 from app.NameSearcher import NameSearcher
 from app.supabase_auth import (
@@ -37,6 +39,11 @@ class TrackCompanyRequest(BaseModel):
 
 class CompanySearchRequest(BaseModel):
     query: str = Field(min_length=1, max_length=200)
+
+
+class ChatRequest(BaseModel):
+    company_name: str
+    question: str
 
 
 def _normalize_contenders(payload: dict) -> list[dict[str, str]]:

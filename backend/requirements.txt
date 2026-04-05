@@ -3,5 +3,5 @@ uvicorn[standard]
 pydantic-settings
 python-multipart
 requests
-genai
+google-genai
 python-dotenv
