@@ -57,6 +57,16 @@ function authHeaders(): HeadersInit {
   return headers;
 }
 
+async function fetchWithAuth(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const response = await fetch(input, init);
+  if (response.status === 401) {
+    localStorage.removeItem('token');
+    window.location.href = '/login';
+    throw new Error('Sesiunea a expirat. Te rugam sa te autentifici din nou.');
+  }
+  return response;
+}
+
 async function getErrorMessage(response: Response, fallback: string): Promise<string> {
   try {
     const data = await response.json();
@@ -121,7 +131,7 @@ export const api = {
   },
 
   async getTrackedCompanies(): Promise<TrackedCompany[]> {
-    const response = await fetch(`${BASE_URL}/tracking/companies`, {
+    const response = await fetchWithAuth(`${BASE_URL}/tracking/companies`, {
       method: 'GET',
       headers: authHeaders(),
     });
@@ -135,7 +145,7 @@ export const api = {
   },
 
   async trackCompany(companyName: string): Promise<TrackedCompany> {
-    const response = await fetch(`${BASE_URL}/tracking/companies`, {
+    const response = await fetchWithAuth(`${BASE_URL}/tracking/companies`, {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify({ company_name: companyName }),
@@ -151,7 +161,7 @@ export const api = {
 
   async deleteTrackedCompany(companyName: string): Promise<number> {
     const encodedName = encodeURIComponent(companyName);
-    const response = await fetch(`${BASE_URL}/tracking/companies/${encodedName}`, {
+    const response = await fetchWithAuth(`${BASE_URL}/tracking/companies/${encodedName}`, {
       method: 'DELETE',
       headers: authHeaders(),
     });
@@ -165,7 +175,7 @@ export const api = {
   },
 
   async searchCompanyCandidates(query: string): Promise<CompanyCandidate[]> {
-    const response = await fetch(`${BASE_URL}/tracking/company-search`, {
+    const response = await fetchWithAuth(`${BASE_URL}/tracking/company-search`, {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify({ query }),
@@ -186,7 +196,7 @@ export const api = {
 
     let response: Response;
     try {
-      response = await fetch(`${BASE_URL}/tracking/companies/${encodedName}/details`, {
+      response = await fetchWithAuth(`${BASE_URL}/tracking/companies/${encodedName}/details`, {
         method: 'GET',
         headers: authHeaders(),
         signal: controller.signal,
@@ -208,7 +218,7 @@ export const api = {
   },
 
   async askAI(companyName: string, question: string): Promise<{ answer: string }> {
-    const response = await fetch(`${BASE_URL}/tracking/chat`, {
+    const response = await fetchWithAuth(`${BASE_URL}/tracking/chat`, {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify({ company_name: companyName, question }),

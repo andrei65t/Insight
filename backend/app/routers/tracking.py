@@ -292,6 +292,12 @@ def chat_with_ai(payload: ChatRequest, authorization: str | None = Header(defaul
         
         return json.loads(response_json)
 
+    except RuntimeError as exc:
+        message = str(exc)
+        logger.error("POST /tracking/chat failed: %s", message)
+        if "Invalid or expired access token" in message:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=message) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message) from exc
     except Exception as exc:
         logger.error("POST /tracking/chat failed: %s", str(exc))
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
