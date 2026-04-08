@@ -1,7 +1,7 @@
 import requests
 import json
 from datetime import datetime, timedelta, timezone
-
+import os
 
 def _normalize_news_date(raw_date: str) -> str | None:
     if not raw_date:
@@ -53,7 +53,7 @@ def search_news(company_name):
         "page": 1,
     }
     headers = {
-        'X-API-KEY': '3a29d67d1c639a367127544232f00f3bbb4c89a0',
+        'X-API-KEY': os.getenv("X_API_KEY"),
         'Content-Type': 'application/json'
     }
 
